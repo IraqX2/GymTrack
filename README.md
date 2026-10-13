@@ -36,7 +36,7 @@ python -m venv .venv
 
 Activate the environment:
 
-- Windows PowerShell: `.venv\\Scripts\\Activate.ps1`
+- Windows PowerShell: `.venv\Scripts\Activate.ps1`
 - macOS/Linux: `source .venv/bin/activate`
 
 Then install the packages and start FastAPI:
