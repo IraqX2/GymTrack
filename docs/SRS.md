@@ -1,122 +1,127 @@
 # Software Requirements Specification (SRS)
+
 ## GymTrack
 
-| Document field | Value |
-|---|---|
-| Version | 1.0 |
-| Status | Initial project baseline |
-| Course | CSE309 |
-| Last updated | 13 October 2026 |
+- **Course:** CSE309
+- **Version:** 1.1
+- **Status:** Draft
+- **Updated:** 13 October 2026
 
 ## 1. Purpose
-This document defines the functional and non-functional requirements for GymTrack. The requirements are written to guide implementation and testing. Release labels distinguish the locally running MVP from the Beta planned for the final demonstration.
 
-## 2. Product scope
-GymTrack is a web application with a React + TypeScript frontend and a FastAPI + Python backend exposed through REST endpoints. The repository currently includes a starter dashboard and demo API endpoints. The CRUD requirements below describe planned implementation work and are not claims that all features are already complete.
+This document lists what GymTrack should do and the basic conditions it should meet. It is meant to guide development and help check the features during testing.
 
-## 3. User classes
-- **Administrator:** manages gym operations and core records.
-- **Trainer:** manages assigned workout plans and reviews progress; role-based access is planned for Beta.
-- **Member:** views personal membership, attendance, and workout information; authenticated self-service is planned for Beta.
-- **Visitor/unauthenticated user:** can access only non-sensitive public or sign-in surfaces once authentication is implemented.
+## 2. Current state and scope
 
-## 4. Operating environment
-- Modern desktop or mobile web browser.
-- Frontend development server: Vite, normally at `http://localhost:5173`.
-- Backend development server: Uvicorn/FastAPI, normally at `http://127.0.0.1:8000`.
-- MVP persistence target: SQLite local database.
-- The exact deployment environment will be selected during Beta planning.
+The current starter contains a React dashboard and a FastAPI backend with three simple endpoints. The main gym features described below are planned work. They should not be considered implemented until they are added and tested.
 
-## 5. Functional requirements
+The frontend uses React, TypeScript, and Vite. The backend uses Python and FastAPI. The first version is intended to run locally.
 
-### 5.1 Shared application requirements
-| ID | Requirement | Release |
+## 3. User types
+
+- **Administrator:** manages gym records.
+- **Trainer:** works with assigned workout plans. Role restrictions are planned for Beta.
+- **Member:** views their own membership, attendance, and workout information after login is added.
+
+## 4. Functional requirements
+
+### General
+
+| ID | Requirement | Version |
 |---|---|---|
-| FR-01 | The system shall provide a frontend interface for the GymTrack core modules. | MVP |
-| FR-02 | The frontend shall communicate with the backend through HTTP REST endpoints. | MVP |
-| FR-03 | The backend shall validate request data and return meaningful HTTP status codes for success and failure. | MVP |
-| FR-04 | The system shall persist core records so data remains available after a local application restart. | MVP |
-| FR-05 | The system shall provide a health endpoint for checking API availability. | MVP (starter present) |
+| FR-01 | The app shall provide pages for the main GymTrack modules. | MVP |
+| FR-02 | The frontend shall send requests to the backend through the REST API. | MVP |
+| FR-03 | The backend shall check submitted data and return an error for invalid requests. | MVP |
+| FR-04 | The app shall save records in a database so they remain after a restart. | MVP |
+| FR-05 | The API shall provide a health endpoint. | Starter exists |
 
-### 5.2 Member management
-| ID | Requirement | Release |
+### Members and trainers
+
+| ID | Requirement | Version |
 |---|---|---|
-| FR-10 | The system shall create a member record with a unique identifier and required profile fields. | MVP |
-| FR-11 | The system shall list and retrieve member records. | MVP |
-| FR-12 | The system shall update and delete a member record. | MVP |
-| FR-13 | The system shall validate required fields and reject invalid data. | MVP |
+| FR-10 | An administrator shall be able to add a member. | MVP |
+| FR-11 | The app shall list and show member details. | MVP |
+| FR-12 | An administrator shall be able to edit or remove a member. | MVP |
+| FR-13 | An administrator shall be able to add, list, edit, and remove trainers. | MVP |
 
-### 5.3 Trainer management
-| ID | Requirement | Release |
+### Membership and attendance
+
+| ID | Requirement | Version |
 |---|---|---|
-| FR-20 | The system shall create a trainer record with a unique identifier and required profile fields. | MVP |
-| FR-21 | The system shall list, retrieve, update, and delete trainer records. | MVP |
-| FR-22 | The system shall allow workout plans to be associated with a trainer. | MVP |
+| FR-20 | The app shall store a member's plan and membership dates. | MVP |
+| FR-21 | The app shall show the membership status. | MVP |
+| FR-22 | An administrator shall be able to record a check-in for a member. | MVP |
+| FR-23 | The app shall show attendance history for a selected member. | MVP |
 
-### 5.4 Membership and attendance
-| ID | Requirement | Release |
+### Workout plans
+
+| ID | Requirement | Version |
 |---|---|---|
-| FR-30 | The system shall record a member's membership plan and start/end dates. | MVP |
-| FR-31 | The system shall derive or display membership status from the stored dates and status fields. | MVP |
-| FR-32 | The system shall record a dated attendance check-in for a member. | MVP |
-| FR-33 | The system shall retrieve attendance history for a selected member. | MVP |
+| FR-30 | An administrator shall be able to create, view, edit, and remove workout plans. | MVP |
+| FR-31 | A workout plan shall be assignable to a member and, when needed, a trainer. | MVP |
+| FR-32 | The app shall keep a basic progress history. | Beta |
 
-### 5.5 Workout plans and progress
-| ID | Requirement | Release |
+### Login and permissions
+
+| ID | Requirement | Version |
 |---|---|---|
-| FR-40 | The system shall create, retrieve, update, and delete workout plans. | MVP |
-| FR-41 | The system shall associate a workout plan with a member and optionally a trainer. | MVP |
-| FR-42 | The system shall support recording or reviewing basic progress history. | Beta |
-| FR-43 | A member shall be able to view their assigned workout plans after signing in. | Beta |
+| FR-40 | A registered user shall be able to sign in. | Beta |
+| FR-41 | The system shall distinguish administrator, trainer, and member roles. | Beta |
+| FR-42 | The backend shall check permissions for protected actions. | Beta |
+| FR-43 | A member shall only be able to view their own private records. | Beta |
 
-### 5.6 Authentication, roles, and profiles
-| ID | Requirement | Release |
-|---|---|---|
-| FR-50 | The system shall authenticate registered users before granting access to protected views. | Beta |
-| FR-51 | The system shall distinguish administrator, trainer, and member roles. | Beta |
-| FR-52 | The backend shall enforce role permissions for protected operations. | Beta |
-| FR-53 | Users shall be able to view and update permitted profile fields. | Beta |
-| FR-54 | Members shall only be able to view their own private membership, attendance, and workout data. | Beta |
+## 5. Non-functional requirements
 
-## 6. External interface requirements
-- **User interface:** Responsive browser-based pages with clear module navigation, forms, loading states, success messages, and validation errors.
-- **Software interface:** React calls FastAPI REST endpoints using JSON for request and response bodies where applicable.
-- **API baseline:** The starter currently provides `GET /api/health`, `GET /api/hello`, and `GET /api/modules`. Future CRUD endpoints should use resource-oriented paths (for example, `/api/members`) and standard HTTP methods.
-- **Error interface:** Invalid input should return a 4xx response; unexpected server failures should not reveal secrets or stack traces to end users.
+| ID | Requirement |
+|---|---|
+| NFR-01 | Frontend and backend code shall stay in separate folders. |
+| NFR-02 | The main pages should be usable on common desktop and mobile screen sizes. |
+| NFR-03 | Invalid input shall not be saved as a valid record. |
+| NFR-04 | Error messages should help the user understand what went wrong without showing private system details. |
+| NFR-05 | Passwords shall not be stored as plain text when login is implemented. |
+| NFR-06 | Secret keys and local environment files shall not be committed to GitHub. |
+| NFR-07 | The main workflows shall have repeatable test steps. |
 
-## 7. Non-functional requirements
-| ID | Requirement | Target/Release |
-|---|---|---|
-| NFR-01 | The frontend and backend shall be maintainable in separate folders with clear responsibilities. | MVP |
-| NFR-02 | Core pages should remain usable on common desktop and mobile viewport sizes. | MVP |
-| NFR-03 | API input shall be validated before changing stored records. | MVP |
-| NFR-04 | During normal local demonstration, common CRUD requests should return promptly under a small test dataset. | MVP |
-| NFR-05 | Protected data shall require authentication and server-side authorization. | Beta |
-| NFR-06 | Passwords, when authentication is implemented, shall never be stored in plain text. | Beta |
-| NFR-07 | Secrets and environment-specific settings shall be kept out of source control. | Beta |
-| NFR-08 | Important workflows shall have repeatable manual or automated test steps. | MVP |
-| NFR-09 | The application shall provide useful error messages without exposing sensitive implementation details. | MVP/Beta |
+## 6. Interfaces
 
-## 8. Data requirements (MVP target)
-The proposed SQLite schema will include:
-- **Member:** member ID, name, contact details, join date, and active status.
-- **Trainer:** trainer ID, name, contact details, specialization, and active status.
-- **Membership:** membership ID, member ID, plan name, start date, end date, and status.
-- **Attendance:** attendance ID, member ID, check-in timestamp.
-- **WorkoutPlan:** plan ID, title, description, trainer ID (optional), member ID (optional), and created/updated timestamps.
-- **ProgressEntry (Beta):** entry ID, member ID, plan ID, date, notes, and progress measurements as agreed by the team.
+- **Frontend:** browser-based React application.
+- **Backend:** FastAPI REST endpoints returning JSON.
+- **Local development:** Vite usually runs on port 5173; FastAPI runs on port 8000.
+- **Database:** SQLite is the current proposal for the first version.
 
-Each record shall have a stable identifier. Related records shall use valid references. Final fields and validation rules should be confirmed before database migrations are written.
+The starter endpoints are:
 
-## 9. Acceptance and verification
-- **AT-01:** A valid member can be created and then retrieved by the API.
-- **AT-02:** Updating a record changes the returned data; deleting it removes it from subsequent retrieval.
-- **AT-03:** Invalid required fields are rejected with a 4xx response.
-- **AT-04:** A membership can be associated with an existing member and its status can be displayed.
-- **AT-05:** An attendance check-in can be saved and appears in that member's history.
-- **AT-06:** A workout plan can be created and assigned.
-- **AT-07:** The frontend can call the backend through the configured development proxy.
-- **AT-08 (Beta):** Users cannot access functions or personal data beyond their assigned permissions.
+- `GET /api/health`
+- `GET /api/hello?name=YourName`
+- `GET /api/modules`
 
-## 10. Assumptions and limitations
-SQLite is a proposed local MVP database and may be adjusted if the course rubric specifies another technology. The starter currently has no persistent database, real authentication, complete CRUD modules, or production deployment. These are planned features, not implemented functionality.
+The member, trainer, membership, attendance, and workout-plan endpoints still need to be implemented.
+
+## 7. Data to store
+
+The planned database will include:
+
+- **Member:** ID, name, contact details, join date, and active status.
+- **Trainer:** ID, name, contact details, and specialization.
+- **Membership:** ID, member ID, plan name, start date, end date, and status.
+- **Attendance:** ID, member ID, and check-in time.
+- **Workout plan:** ID, title, description, and assigned member/trainer.
+- **Progress entry (Beta):** ID, member ID, date, and progress notes.
+
+Records should have unique IDs. A membership or attendance record should not refer to a member who does not exist.
+
+## 8. Acceptance checks
+
+- **AT-01:** A member can be added and then retrieved.
+- **AT-02:** Editing a member changes the stored details.
+- **AT-03:** Removing a member removes it from later results.
+- **AT-04:** Invalid required fields are rejected.
+- **AT-05:** A membership can be linked to an existing member.
+- **AT-06:** An attendance record can be saved and viewed in the member's history.
+- **AT-07:** A workout plan can be created and assigned.
+- **AT-08:** The frontend can reach the backend through the local Vite proxy.
+- **AT-09 (Beta):** A user cannot access data or actions outside their role.
+
+## 9. Limitations
+
+The starter does not yet have database storage, full CRUD features, login, role permissions, or deployment. The requirements above describe the intended work for the project.
