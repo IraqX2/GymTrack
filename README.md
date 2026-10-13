@@ -1,51 +1,53 @@
 # GymTrack
 
-GymTrack is a web-based gym management system for organizing members, trainers, memberships, attendance, and workout plans.
+GymTrack is a gym management web app for keeping track of members, trainers, memberships, attendance, and workout plans. This is a CSE309 project.
 
-## Technology stack
-- **Frontend:** React + TypeScript + Vite
-- **Backend:** FastAPI + Python
-- **API style:** REST
+## Tech stack
 
-## Planned releases
+- Frontend: React, TypeScript, and Vite
+- Backend: Python and FastAPI
+- Frontend/backend communication: REST API
 
-### MVP — Midterm demo
-- React + TypeScript starter dashboard
-- FastAPI service and REST endpoints
-- Core CRUD workflows for members, trainers, memberships, attendance, and workout plans
-- Run locally
+## Current status
 
-### Beta — Final demo
-- Authentication and role-based access control (RBAC)
-- User profile dashboard
-- Permission/security scopes
-- Deployment
+The repository has the initial dashboard and a few API endpoints to check that the frontend can reach the backend. The numbers on the dashboard are sample values. They are not coming from a database.
 
-> The dashboard statistics and module cards currently contain demo/placeholder data. Database persistence and full CRUD are not implemented yet.
+The main gym features are still to be built. The planned first version is meant to run locally and cover basic member and trainer records, memberships, attendance, and workout plans. Database storage is also part of that work. Login, role-based permissions, profiles, and deployment are planned for the later version.
 
-## Repository structure
+## Project structure
+
 ```text
 GymTrack/
-├── frontend/  # React + TypeScript + Vite
-├── backend/   # FastAPI + Python
+├── frontend/  # React app
+├── backend/   # FastAPI app
 └── docs/      # PRD, SRS, and TDD
 ```
 
 ## Run locally
 
-Use two terminals from the repository root.
+You need Python and Node.js/npm installed. Start the backend and frontend in separate terminals.
 
-**Terminal 1 — Backend**
+**1. Backend**  
+Run these commands from the repository root:
 
 ```bash
 python -m venv .venv
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
+```
+
+Activate the environment:
+
+- Windows PowerShell: `.venv\\Scripts\\Activate.ps1`
+- macOS/Linux: `source .venv/bin/activate`
+
+Then install the packages and start FastAPI:
+
+```bash
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
 ```
 
-**Terminal 2 — Frontend**
+**2. Frontend**  
+Open another terminal:
 
 ```bash
 cd frontend
@@ -53,8 +55,14 @@ npm install
 npm run dev
 ```
 
-Open the local URL shown by Vite, usually http://localhost:5173. The FastAPI interactive docs are at http://127.0.0.1:8000/docs.
+Open the local URL printed by Vite, usually http://localhost:5173. FastAPI's interactive API page is at http://127.0.0.1:8000/docs.
 
-## Current status
+## Starter endpoints
 
-This repository contains the initial frontend and backend foundation. Core business workflows, database persistence, authentication, and deployment remain future work.
+- `GET /api/health`: check whether the API is running
+- `GET /api/hello?name=YourName`: test a simple request and response
+- `GET /api/modules`: return the planned modules
+
+These endpoints are only for the starter stage. Full CRUD, database storage, and authentication are not implemented yet.
+
+See [docs/PRD.md](docs/PRD.md), [docs/SRS.md](docs/SRS.md), and [docs/TDD.md](docs/TDD.md) for the planned scope and design.
