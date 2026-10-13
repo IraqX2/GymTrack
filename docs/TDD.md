@@ -1,45 +1,46 @@
 # Technical Design Document (TDD)
+
 ## GymTrack
 
-| Document field | Value |
-|---|---|
-| Version | 1.0 |
-| Status | Initial technical baseline |
-| Course | CSE309 |
-| Last updated | 13 October 2026 |
+- **Course:** CSE309
+- **Version:** 1.1
+- **Status:** Draft
+- **Updated:** 13 October 2026
 
-## 1. Purpose
-This document describes the proposed technical architecture, module boundaries, API conventions, data design, security approach, and verification plan for GymTrack. It separates what exists in the starter repository from design decisions that remain to be implemented.
+## 1. Overview
 
-## 2. Technology stack
-- **Frontend:** React + TypeScript, built and served during development with Vite.
-- **Backend:** FastAPI + Python, served locally with Uvicorn.
-- **Communication:** HTTP REST API using JSON.
-- **MVP persistence proposal:** SQLite, accessed through a Python ORM (SQLModel or SQLAlchemy, subject to implementation choice).
-- **Version control:** Git and GitHub, using Issues, feature branches, commits, and Pull Requests.
+This document explains how GymTrack is arranged now and how the main features are expected to be added. The current code is a starter, so the proposed database and gym-management endpoints below are not implemented yet.
 
-The required frontend/backend stack is fixed by the course. The specific ORM and final deployment target remain implementation decisions.
+## 2. Technology
 
-## 3. High-level architecture
+- React, TypeScript, and Vite for the frontend.
+- Python and FastAPI for the backend.
+- REST endpoints with JSON for communication.
+- SQLite is proposed for local data storage in the first version.
+- GitHub Issues, feature branches, and pull requests for tracking changes.
+
+## 3. Application structure
+
+The browser loads the React app. The frontend sends HTTP requests to FastAPI. When database storage is added, the backend will validate the request and read or write records in SQLite.
+
 ```text
 Browser
   |
   v
-React + TypeScript (Vite frontend)
-  |  HTTP / JSON requests under /api
+React + TypeScript (Vite)
+  |
+  | HTTP / JSON
   v
-FastAPI REST backend
-  |  validation and business rules
-  v
-Persistence layer (planned for MVP)
+FastAPI backend
   |
   v
-SQLite database (proposed for local MVP)
+SQLite database (planned)
 ```
 
-The frontend is responsible for presentation, form state, and displaying responses. The backend is responsible for request validation, business rules, permission checks when added, and data persistence. The frontend must not connect directly to the database.
+The frontend should not connect directly to the database. Validation and data rules belong in the backend.
 
 ## 4. Repository layout
+
 ```text
 GymTrack/
 ├── frontend/
@@ -59,98 +60,109 @@ GymTrack/
 │   ├── PRD.md
 │   ├── SRS.md
 │   └── TDD.md
-├── .gitignore
 └── README.md
 ```
 
-As the MVP grows, backend modules may be split into routers, schemas, services, and database models. Avoid adding abstractions before the core workflows require them.
+## 5. Backend
 
-## 5. Backend design
+### Endpoints already in the starter
 
-### 5.1 Current starter endpoints
-| Method | Path | Purpose | Status |
-|---|---|---|---|
-| GET | `/api/health` | Return API health status | Implemented |
-| GET | `/api/hello?name=...` | Demo request/response | Implemented |
-| GET | `/api/modules` | List the planned core modules | Implemented |
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/health` | Check whether the API is running |
+| GET | `/api/hello?name=...` | Test a simple request and response |
+| GET | `/api/modules` | Return the list of planned modules |
 
-FastAPI also provides interactive API documentation locally at `/docs`.
+FastAPI also provides an interactive page at `/docs` when the backend is running.
 
-### 5.2 Planned MVP resource endpoints
-| Resource | Proposed endpoints |
+### Endpoints planned for the first version
+
+| Resource | Planned operations |
 |---|---|
-| Members | `GET /api/members`, `POST /api/members`, `GET /api/members/{id}`, `PUT /api/members/{id}`, `DELETE /api/members/{id}` |
-| Trainers | Same CRUD pattern under `/api/trainers` |
-| Memberships | CRUD under `/api/memberships` |
-| Attendance | `POST /api/attendance`, `GET /api/attendance?member_id={id}` |
-| Workout plans | CRUD under `/api/workout-plans` |
+| Members | Create, list, view, edit, and delete |
+| Trainers | Create, list, view, edit, and delete |
+| Memberships | Create, list, view, edit, and delete |
+| Attendance | Record a check-in and view history |
+| Workout plans | Create, list, view, edit, and delete |
 
-These routes are proposed and are not present in the starter yet. Endpoint schemas should use typed Pydantic request/response models. Use suitable status codes such as 200/201 for success, 204 where no response body is needed, 404 for missing records, and 422 for invalid request data.
+The exact paths and request fields should be settled when each feature is implemented. The backend should validate the submitted data and return useful status codes. For example, a missing record should return 404 and invalid input should return a 4xx response.
 
-## 6. Data model design
-The initial relational model is:
-- **Member** has many Membership records, Attendance records, and assigned WorkoutPlans.
-- **Trainer** may be associated with multiple WorkoutPlans.
-- **WorkoutPlan** may reference a member, a trainer, or both depending on the assignment workflow.
-- **ProgressEntry** (Beta) references a member and optionally a workout plan.
+## 6. Database plan
 
-Every entity should use a stable primary key. Foreign keys should protect relationships and required fields should be validated at the API boundary. Membership status can be stored explicitly or derived from start/end dates; choose one consistent approach during implementation. Database migrations or a documented schema-creation step should be used when persistence is added.
+SQLite is proposed because the first version needs to run locally without a separate database server. The initial tables are expected to be:
 
-## 7. Frontend design
-The React app currently uses a small dashboard component and a Vite proxy so local requests to `/api` are forwarded to the FastAPI server on port 8000. The displayed counts and module rows are placeholder content.
+- **Member:** member details and active status.
+- **Trainer:** trainer details and specialization.
+- **Membership:** member reference, plan, dates, and status.
+- **Attendance:** member reference and check-in time.
+- **WorkoutPlan:** title, description, and assigned member/trainer.
+- **ProgressEntry (later version):** member reference, date, and progress notes.
 
-Planned frontend components:
-- **Dashboard:** entry point and summary of core modules.
-- **Members:** member list and create/edit form.
-- **Trainers:** trainer list and create/edit form.
-- **Memberships:** plan and status views.
-- **Attendance:** check-in and history.
-- **Workout plans:** plan creation, assignment, and details.
-- **Profile and access-aware navigation (Beta):** show information and actions appropriate to the signed-in role.
+Each table should have a unique ID. Related records should use valid references. The final fields and database library still need to be confirmed during implementation.
 
-Keep API calls separate from display-only concerns as the app expands, and show loading, empty, success, and error states for data operations.
+## 7. Frontend plan
 
-## 8. Authentication and authorization (Beta)
-Use established password hashing and a well-reviewed authentication approach rather than custom cryptography. The backend must verify role permissions on each protected endpoint; hiding a button in the frontend is not an authorization control. Enforce member-level data isolation so members can only access their own private records. Keep secret keys in environment variables and do not commit local `.env` files. Production deployment should use HTTPS.
+The current dashboard is in `frontend/src/App.tsx`. It displays sample counts and planned modules, and includes a small form to test the API connection. The numbers are not real gym data.
 
-## 9. Error handling and validation
-- Validate incoming fields using typed request schemas.
-- Return consistent JSON error responses.
-- Use 404 for missing resources and 422 for invalid payloads.
-- Prevent invalid relationships, such as an attendance record for a nonexistent member.
-- Avoid leaking tracebacks, credentials, or private information in user-visible messages.
+As the project grows, the planned pages are:
 
-## 10. Local development setup
-Prerequisites: Python 3.10+ and a current Node.js/npm installation.
+- Members
+- Trainers
+- Memberships
+- Attendance
+- Workout plans
 
-**Backend terminal, from the repository root:**
+Each page should call the backend rather than keep its own separate copy of the data. Forms should show validation errors and a useful message when a request fails.
+
+## 8. Login and permissions
+
+Login is planned for the later version. When it is added, the backend must check the user's role on protected requests. Hiding a button in React is not enough to protect data. Passwords should be hashed using an established library, and secret keys should be kept out of the repository.
+
+## 9. Local setup
+
+Install Python and Node.js/npm first. Run the backend and frontend in separate terminals.
+
+**Backend, from the repository root:**
+
 ```bash
 python -m venv .venv
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
+```
+
+Activate the environment:
+
+- Windows PowerShell: `.venv\\Scripts\\Activate.ps1`
+- macOS/Linux: `source .venv/bin/activate`
+
+Then run:
+
+```bash
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
 ```
 
-**Frontend terminal, from the repository root:**
+**Frontend, in another terminal:**
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Open the URL printed by Vite, typically `http://localhost:5173`. Check the API at `http://127.0.0.1:8000/api/health` and the interactive docs at `http://127.0.0.1:8000/docs`.
+Open the URL printed by Vite, usually `http://localhost:5173`. To check the backend, open `http://127.0.0.1:8000/api/health` or `http://127.0.0.1:8000/docs`.
 
-## 11. Testing strategy
-- **API smoke tests:** confirm the health endpoint responds and the demo endpoints return the expected JSON.
-- **CRUD tests (MVP):** test success paths, missing IDs, invalid values, and relationship constraints for each resource.
-- **Frontend integration:** confirm frontend requests reach the backend through the Vite proxy and failures are displayed clearly.
-- **Role/security tests (Beta):** test unauthenticated access, role restrictions, and member data isolation.
-- **Regression checks:** run tests after each feature branch is merged and document any known limitations.
+## 10. Testing plan
 
-## 12. Release and deployment strategy
-- **MVP:** local development, REST endpoints, basic CRUD, and local persistence; no public deployment required.
-- **Beta:** add authentication, RBAC, profile dashboard, scoped permissions, security hardening, and deployment-specific environment configuration.
+For the starter, check that the health endpoint works and that the frontend can send a request to the backend.
 
-## 13. Known limitations and pending decisions
-The current repository contains a starter dashboard and demo FastAPI endpoints only. It does not yet contain database persistence, core CRUD endpoints, authentication, role permissions, or production deployment. SQLite and an ORM are proposed for the MVP, but the implementation choice should be confirmed with the course requirements before being treated as final.
+When the main features are added, test that:
+- records can be created, viewed, edited, and deleted;
+- invalid input is rejected;
+- memberships and attendance refer to existing members;
+- workout plans can be assigned correctly;
+- the frontend shows an error if the API is unavailable.
+
+After login is added, test that each role can only access the actions and records it is allowed to use.
+
+## 11. Known gaps
+
+The repository currently has no database, full CRUD endpoints, login, role permissions, or deployment setup. SQLite is a proposal, not a completed implementation. These items should be added in small steps and reflected in the documentation as they are completed.
