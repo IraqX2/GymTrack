@@ -8,11 +8,33 @@ from sqlmodel import Field as SQLField, Session, SQLModel, create_engine, select
 
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./gymtrack.db")
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-)
+from sqlalchemy.pool import NullPool
+
+raw_database_url = os.getenv("DATABASE_URL", "sqlite:///./gymtrack.db")
+
+# Supabase provides PostgreSQL URLs. Use psycopg 3 explicitly so the same
+# SQLModel code works locally with SQLite and in Vercel with PostgreSQL.
+if raw_database_url.startswith("postgres://"):
+    DATABASE_URL = raw_database_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif raw_database_url.startswith("postgresql://"):
+    DATABASE_URL = raw_database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+else:
+    DATABASE_URL = raw_database_url
+
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    # Vercel functions use short-lived invocations. NullPool avoids retaining
+    # connections between invocations; prepare_threshold=None is compatible
+    # with Supabase's transaction-mode pooler.
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=NullPool,
+        connect_args={"prepare_threshold": None, "sslmode": "require"},
+    )
 
 class Member(SQLModel, table=True):
     id: Optional[int] = SQLField(default=None, primary_key=True)
