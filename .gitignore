@@ -4,6 +4,8 @@ __pycache__/
 .venv/
 venv/
 .env
+gymtrack.db
+*.db
 
 # Node
 node_modules/
