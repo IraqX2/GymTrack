@@ -74,6 +74,7 @@ export default function App() {
     request<{ status: string }>("/api/health")
       .then(() => setApiStatus("Connected"))
       .catch(() => setApiStatus("Not connected"));
+    void loadMembers();
   }, []);
 
   useEffect(() => {
