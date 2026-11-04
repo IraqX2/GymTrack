@@ -48,3 +48,12 @@ td strong{font-size:11px}
 .status-number{font-size:24px!important}
 @media(max-width:1100px){.member-grid{grid-template-columns:1fr}}
 @media(max-width:700px){.actions{gap:5px}.actions .text-button{font-size:9px}}
+
+/* Dashboard navigation and planned modules */
+button.nav-link{width:100%;border:0;background:transparent;text-align:left;cursor:pointer;font:inherit}
+button.nav-link:hover{background:#26364e;color:#fff}
+.module-button{width:100%;border:0;background:transparent;text-align:left;cursor:pointer}
+.module-button:hover{background:#f8fafc}
+.overview-button{width:100%;margin-top:18px}
+.planned-panel h3{font:600 19px "Space Grotesk",sans-serif;margin:9px 0}
+.planned-panel p:not(.eyebrow){font-size:12px;color:#7a8599;line-height:1.7;margin-bottom:18px}
