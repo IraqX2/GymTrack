@@ -10,7 +10,18 @@ import os
 
 from sqlalchemy.pool import NullPool
 
-raw_database_url = os.getenv("DATABASE_URL", "sqlite:///./gymtrack.db")
+configured_database_url = os.getenv("DATABASE_URL")
+
+# Vercel Functions have a read-only deployment filesystem. When no hosted
+# DATABASE_URL is configured, use /tmp only as a temporary demo fallback.
+# Local development continues to use the persistent project SQLite file.
+if configured_database_url:
+    raw_database_url = configured_database_url
+elif os.getenv("VERCEL") == "1":
+    raw_database_url = "sqlite:////tmp/gymtrack.db"
+    print("DATABASE_URL is not set; using ephemeral /tmp SQLite on Vercel.")
+else:
+    raw_database_url = "sqlite:///./gymtrack.db"
 
 # Supabase provides PostgreSQL URLs. Use psycopg 3 explicitly so the same
 # SQLModel code works locally with SQLite and in Vercel with PostgreSQL.
@@ -71,10 +82,16 @@ def get_session():
     with Session(engine) as session:
         yield session
 
+# Vercel's /api/* rewrite preserves the original URL path, so expose
+# Swagger under /api/docs there. Keep the standard /docs path locally.
+is_vercel = os.getenv("VERCEL") == "1"
+
 app = FastAPI(
     title="GymTrack API",
     description="REST API for GymTrack member management.",
     version="1.0.0",
+    docs_url="/api/docs" if is_vercel else "/docs",
+    openapi_url="/api/openapi.json" if is_vercel else "/openapi.json",
 )
 
 app.add_middleware(
