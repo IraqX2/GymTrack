@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlmodel import Field as SQLField, Session, SQLModel, create_engine, select
 
-DATABASE_URL = "sqlite:///./gymtrack.db"
+import os
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./gymtrack.db")
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
 )
 
 class Member(SQLModel, table=True):
