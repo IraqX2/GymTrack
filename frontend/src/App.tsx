@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Member = {
   id: number;
@@ -99,7 +99,7 @@ export default function App() {
     setNotice("");
   }
 
-  async function submitForm(event: FormEvent<HTMLFormElement>) {
+  async function submitForm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
