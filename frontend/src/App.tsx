@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 type Member = {
   id: number;
@@ -20,10 +20,9 @@ const emptyForm: MemberForm = {
 };
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...options.headers },
-  });
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -116,7 +115,7 @@ export default function App() {
     setMessage("");
   }
 
-  async function saveMember(event: React.FormEvent<HTMLFormElement>) {
+  async function saveMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
