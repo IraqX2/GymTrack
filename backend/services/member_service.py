@@ -1,8 +1,12 @@
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from backend.models.member import Member
-from backend.schemas.member import MemberCreate, MemberUpdate
+try:
+    from backend.models.member import Member
+    from backend.schemas.member import MemberCreate, MemberUpdate
+except ModuleNotFoundError:
+    from models.member import Member
+    from schemas.member import MemberCreate, MemberUpdate
 
 
 def create_member_record(session: Session, payload: MemberCreate) -> Member:
