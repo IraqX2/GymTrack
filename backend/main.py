@@ -3,9 +3,16 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.database import create_db_and_tables
-from backend.routers.members import router as members_router
-from backend.routers.system import router as system_router
+# The Vercel service runs with backend/ as its root, while local development
+# imports this file as backend.main. Support both import contexts.
+try:
+    from backend.database import create_db_and_tables
+    from backend.routers.members import router as members_router
+    from backend.routers.system import router as system_router
+except ModuleNotFoundError:
+    from database import create_db_and_tables
+    from routers.members import router as members_router
+    from routers.system import router as system_router
 
 
 # Vercel's /api/* rewrite preserves the original URL path, so expose
