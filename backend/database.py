@@ -50,6 +50,9 @@ def get_session() -> Generator[Session, None, None]:
 
 def create_db_and_tables() -> None:
     # Importing the model registers its table in SQLModel.metadata.
-    from backend.models.member import Member  # noqa: F401
+    try:
+        from backend.models.member import Member  # noqa: F401
+    except ModuleNotFoundError:
+        from models.member import Member  # noqa: F401
 
     SQLModel.metadata.create_all(engine)
