@@ -1,15 +1,27 @@
 from fastapi import APIRouter, Depends, Query, Response
 from sqlmodel import Session
 
-from backend.database import get_session
-from backend.schemas.member import MemberCreate, MemberRead, MemberUpdate
-from backend.services.member_service import (
-    create_member_record,
-    delete_member_record,
-    get_member_record,
-    list_member_records,
-    update_member_record,
-)
+try:
+    from backend.database import get_session
+    from backend.schemas.member import MemberCreate, MemberRead, MemberUpdate
+    from backend.services.member_service import (
+        create_member_record,
+        delete_member_record,
+        get_member_record,
+        list_member_records,
+        update_member_record,
+    )
+except ModuleNotFoundError:
+    from database import get_session
+    from schemas.member import MemberCreate, MemberRead, MemberUpdate
+    from services.member_service import (
+        create_member_record,
+        delete_member_record,
+        get_member_record,
+        list_member_records,
+        update_member_record,
+    )
+
 
 router = APIRouter(prefix="/api/members", tags=["members"])
 
