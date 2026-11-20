@@ -1,37 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
-
-type Member = {
-  id: number;
-  full_name: string;
-  email: string;
-  phone: string;
-  join_date: string;
-  is_active: boolean;
-};
-
-type MemberForm = Omit<Member, "id">;
-
-const emptyForm: MemberForm = {
-  full_name: "",
-  email: "",
-  phone: "",
-  join_date: new Date().toISOString().slice(0, 10),
-  is_active: true,
-};
-
-async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const response = await fetch(url, { ...options, headers });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `Request failed: ${response.status}`);
-  }
-
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
-}
+import { useEffect, useState } from "react";
+import MembersPage from "./pages/MembersPage";
+import { checkApiHealth, getMembers } from "./services/api";
+import type { Member } from "./types/member";
 
 const modules = [
   { title: "Members", description: "Maintain gym member records.", icon: "♙" },
@@ -41,126 +11,45 @@ const modules = [
   { title: "Workout plans", description: "Plan exercises and track progress.", icon: "⌁" },
 ];
 
+const navigation = ["Overview", "Members", "Trainers", "Memberships", "Attendance", "Workout plans"];
+
 export default function App() {
   const [activePage, setActivePage] = useState("Overview");
   const [apiStatus, setApiStatus] = useState("Checking...");
-  const [members, setMembers] = useState<Member[]>([]);
-  const [selected, setSelected] = useState<Member | null>(null);
-  const [form, setForm] = useState<MemberForm>(emptyForm);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-
-  async function loadMembers() {
-    setLoading(true);
-    try {
-      const data = await request<Member[]>("/api/members");
-      setMembers(data);
-      setApiStatus("Connected");
-      setError("");
-    } catch (err) {
-      setApiStatus("Not connected");
-      setError(err instanceof Error ? err.message : "Could not load members.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [memberCount, setMemberCount] = useState(0);
+  const [activeMemberCount, setActiveMemberCount] = useState(0);
 
   useEffect(() => {
-    request<{ status: string }>("/api/health")
-      .then(() => setApiStatus("Connected"))
-      .catch(() => setApiStatus("Not connected"));
-    void loadMembers();
+    let isMounted = true;
+
+    checkApiHealth()
+      .then(() => {
+        if (isMounted) setApiStatus("Connected");
+      })
+      .catch(() => {
+        if (isMounted) setApiStatus("Not connected");
+      });
+
+    getMembers()
+      .then((members) => {
+        if (!isMounted) return;
+        setMemberCount(members.length);
+        setActiveMemberCount(members.filter((member) => member.is_active).length);
+        setApiStatus("Connected");
+      })
+      .catch(() => {
+        if (isMounted) setApiStatus("Not connected");
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  useEffect(() => {
-    if (activePage === "Members") void loadMembers();
-  }, [activePage]);
-
-  function openNewMember() {
-    setSelected(null);
-    setEditingId(null);
-    setForm(emptyForm);
-    setShowForm(true);
-    setError("");
-    setMessage("");
+  function updateMemberCounts(members: Member[]) {
+    setMemberCount(members.length);
+    setActiveMemberCount(members.filter((member) => member.is_active).length);
   }
-
-  async function viewMember(id: number) {
-    try {
-      const member = await request<Member>(`/api/members/${id}`);
-      setSelected(member);
-      setShowForm(false);
-      setError("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load member.");
-    }
-  }
-
-  function editMember(member: Member) {
-    setSelected(null);
-    setEditingId(member.id);
-    setForm({
-      full_name: member.full_name,
-      email: member.email,
-      phone: member.phone,
-      join_date: member.join_date,
-      is_active: member.is_active,
-    });
-    setShowForm(true);
-    setError("");
-    setMessage("");
-  }
-
-  async function saveMember(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      if (editingId === null) {
-        await request<Member>("/api/members", {
-          method: "POST",
-          body: JSON.stringify(form),
-        });
-        setMessage("Member added.");
-      } else {
-        await request<Member>(`/api/members/${editingId}`, {
-          method: "PUT",
-          body: JSON.stringify(form),
-        });
-        setMessage("Member updated.");
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setForm(emptyForm);
-      await loadMembers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save member.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteMember(member: Member) {
-    if (!window.confirm(`Delete ${member.full_name}?`)) return;
-
-    try {
-      await request<void>(`/api/members/${member.id}`, { method: "DELETE" });
-      setSelected(null);
-      setMessage("Member deleted.");
-      await loadMembers();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete member.");
-    }
-  }
-
-  const navigation = ["Overview", "Members", "Trainers", "Memberships", "Attendance", "Workout plans"];
-  const activeMembers = members.filter((member) => member.is_active).length;
 
   return (
     <div className="layout">
@@ -173,14 +62,8 @@ export default function App() {
         {navigation.map((item, index) => (
           <button
             key={item}
-            className={`nav-link ${activePage === item ? "active" : ""}`}
-            onClick={() => {
-              setActivePage(item);
-              setSelected(null);
-              setShowForm(false);
-              setError("");
-              setMessage("");
-            }}
+            className={activePage === item ? "nav-link active" : "nav-link"}
+            onClick={() => setActivePage(item)}
           >
             {["▦", "♙", "♧", "▤", "◷", "⌁"][index]} &nbsp; {item}
           </button>
@@ -221,8 +104,8 @@ export default function App() {
             </section>
 
             <section className="stats">
-              <article className="stat-card"><span>Total Members</span><strong>{members.length}</strong><small>Member records</small></article>
-              <article className="stat-card"><span>Active Members</span><strong>{activeMembers}</strong><small>Currently active</small></article>
+              <article className="stat-card"><span>Total Members</span><strong>{memberCount}</strong><small>Member records</small></article>
+              <article className="stat-card"><span>Active Members</span><strong>{activeMemberCount}</strong><small>Currently active</small></article>
               <article className="stat-card"><span>Other Modules</span><strong>4</strong><small>Planned features</small></article>
               <article className="stat-card"><span>Backend</span><strong>{apiStatus === "Connected" ? "Live" : "—"}</strong><small>FastAPI connection</small></article>
             </section>
@@ -260,89 +143,10 @@ export default function App() {
         )}
 
         {activePage === "Members" && (
-          <section className="content-grid member-grid">
-            <article className="panel members-panel">
-              <div className="panel-header">
-                <div><p className="eyebrow">GYM DIRECTORY</p><h3>Members</h3></div>
-                <button className="primary-button" onClick={openNewMember}>+ Add member</button>
-              </div>
-              {message && <p className="message success">{message}</p>}
-              {error && <p className="message error">{error}</p>}
-              {loading ? <p className="empty-state">Loading members...</p> : members.length === 0 ? (
-                <p className="empty-state">No members yet. Add your first member.</p>
-              ) : (
-                <div className="table-wrap">
-                  <table>
-                    <thead><tr><th>Member</th><th>Contact</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody>
-                      {members.map((member) => (
-                        <tr key={member.id}>
-                          <td><strong>{member.full_name}</strong><small className="table-sub">ID #{member.id}</small></td>
-                          <td><span>{member.email}</span><small className="table-sub">{member.phone || "No phone"}</small></td>
-                          <td><span className={member.is_active ? "status-pill active-pill" : "status-pill inactive-pill"}>{member.is_active ? "Active" : "Inactive"}</span></td>
-                          <td>
-                            <div className="actions">
-                              <button className="text-button" onClick={() => void viewMember(member.id)}>View</button>
-                              <button className="text-button" onClick={() => editMember(member)}>Edit</button>
-                              <button className="text-button danger-text" onClick={() => void deleteMember(member)}>Delete</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <div className="panel-footer">
-                <span>{members.length} member record(s)</span>
-                <button className="text-button" onClick={() => void loadMembers()}>Refresh list</button>
-              </div>
-            </article>
-
-            <article className="panel form-panel">
-              <div className="panel-header">
-                <div>
-                  <p className="eyebrow">{selected ? "MEMBER DETAILS" : "MEMBER FORM"}</p>
-                  <h3>{selected ? "Member information" : editingId === null ? "Add a member" : "Edit member"}</h3>
-                </div>
-              </div>
-              {selected ? (
-                <div className="details">
-                  <div className="detail-avatar">{selected.full_name.slice(0, 1).toUpperCase()}</div>
-                  <h4>{selected.full_name}</h4>
-                  <span className={selected.is_active ? "status-pill active-pill" : "status-pill inactive-pill"}>{selected.is_active ? "Active" : "Inactive"}</span>
-                  <dl>
-                    <dt>Member ID</dt><dd>#{selected.id}</dd>
-                    <dt>Email</dt><dd>{selected.email}</dd>
-                    <dt>Phone</dt><dd>{selected.phone || "Not provided"}</dd>
-                    <dt>Join date</dt><dd>{selected.join_date}</dd>
-                  </dl>
-                  <div className="form-actions">
-                    <button className="primary-button" onClick={() => editMember(selected)}>Edit member</button>
-                    <button className="secondary-button" onClick={() => setSelected(null)}>Close</button>
-                  </div>
-                </div>
-              ) : showForm ? (
-                <form onSubmit={saveMember}>
-                  <label htmlFor="full_name">Full name</label>
-                  <input id="full_name" required minLength={2} maxLength={100} value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} />
-                  <label htmlFor="email">Email address</label>
-                  <input id="email" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-                  <label htmlFor="phone">Phone number</label>
-                  <input id="phone" maxLength={30} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-                  <label htmlFor="join_date">Join date</label>
-                  <input id="join_date" type="date" required value={form.join_date} onChange={(event) => setForm({ ...form, join_date: event.target.value })} />
-                  <label className="check-label"><input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} /> Active member</label>
-                  <div className="form-actions">
-                    <button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving..." : editingId === null ? "Save member" : "Update member"}</button>
-                    <button className="secondary-button" type="button" onClick={() => setShowForm(false)}>Cancel</button>
-                  </div>
-                </form>
-              ) : (
-                <p className="empty-state">Select a member to view details, or add a new member.</p>
-              )}
-            </article>
-          </section>
+          <MembersPage
+            onApiStatusChange={setApiStatus}
+            onMembersChange={updateMemberCounts}
+          />
         )}
 
         {activePage !== "Overview" && activePage !== "Members" && (
