@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import MembersPage from "./pages/MembersPage";
 import { checkApiHealth, getMembers } from "./services/api";
 import type { Member } from "./types/member";
@@ -46,10 +46,10 @@ export default function App() {
     };
   }, []);
 
-  function updateMemberCounts(members: Member[]) {
+  const updateMemberCounts = useCallback((members: Member[]) => {
     setMemberCount(members.length);
     setActiveMemberCount(members.filter((member) => member.is_active).length);
-  }
+  }, []);
 
   return (
     <div className="layout">
