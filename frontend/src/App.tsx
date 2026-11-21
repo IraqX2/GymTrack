@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
+import AuthPage from "./pages/AuthPage";
 import MembersPage from "./pages/MembersPage";
-import { checkApiHealth, getMembers } from "./services/api";
+import {
+  checkApiHealth,
+  getMembers,
+  logout,
+  restoreSession,
+  type AuthUser,
+} from "./services/api";
 import type { Member } from "./types/member";
 
 const modules = [
@@ -11,15 +18,33 @@ const modules = [
   { title: "Workout plans", description: "Plan exercises and track progress.", icon: "⌁" },
 ];
 
-const navigation = ["Overview", "Members", "Trainers", "Memberships", "Attendance", "Workout plans"];
+const adminNavigation = ["Overview", "Members", "Trainers", "Memberships", "Attendance", "Workout plans"];
 
 export default function App() {
   const [activePage, setActivePage] = useState("Overview");
   const [apiStatus, setApiStatus] = useState("Checking...");
   const [memberCount, setMemberCount] = useState(0);
   const [activeMemberCount, setActiveMemberCount] = useState(0);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [restoringSession, setRestoringSession] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    restoreSession()
+      .then((user) => {
+        if (isMounted) setCurrentUser(user);
+      })
+      .finally(() => {
+        if (isMounted) setRestoringSession(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
     let isMounted = true;
 
     checkApiHealth()
@@ -30,26 +55,54 @@ export default function App() {
         if (isMounted) setApiStatus("Not connected");
       });
 
-    getMembers()
-      .then((members) => {
-        if (!isMounted) return;
-        setMemberCount(members.length);
-        setActiveMemberCount(members.filter((member) => member.is_active).length);
-        setApiStatus("Connected");
-      })
-      .catch(() => {
-        if (isMounted) setApiStatus("Not connected");
-      });
+    if (currentUser.role === "admin") {
+      getMembers()
+        .then((members) => {
+          if (!isMounted) return;
+          setMemberCount(members.length);
+          setActiveMemberCount(members.filter((member) => member.is_active).length);
+          setApiStatus("Connected");
+        })
+        .catch(() => {
+          if (isMounted) setApiStatus("Not connected");
+        });
+    } else {
+      setMemberCount(0);
+      setActiveMemberCount(0);
+    }
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUser]);
 
   const updateMemberCounts = useCallback((members: Member[]) => {
     setMemberCount(members.length);
     setActiveMemberCount(members.filter((member) => member.is_active).length);
   }, []);
+
+  async function signOut() {
+    await logout();
+    setCurrentUser(null);
+    setActivePage("Overview");
+  }
+
+  if (restoringSession) {
+    return <main className="auth-shell"><p className="auth-loading">Restoring your GymTrack session...</p></main>;
+  }
+
+  if (!currentUser) {
+    return <AuthPage onAuthenticated={setCurrentUser} />;
+  }
+
+  const isAdmin = currentUser.role === "admin";
+  const navigation = isAdmin ? adminNavigation : ["Overview"];
+  const initials = currentUser.full_name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
 
   return (
     <div className="layout">
@@ -69,8 +122,12 @@ export default function App() {
           </button>
         ))}
         <div className="sidebar-footer">
-          <span className="avatar">AD</span>
-          <div><strong>Admin Demo</strong><small>Project workspace</small></div>
+          <span className="avatar">{initials || "GT"}</span>
+          <div className="sidebar-user">
+            <strong>{currentUser.full_name}</strong>
+            <small>{currentUser.role}</small>
+          </div>
+          <button className="signout-button" onClick={() => void signOut()} title="Sign out">↗</button>
         </div>
       </aside>
 
@@ -103,46 +160,57 @@ export default function App() {
               <div className="hero-art" aria-hidden="true"><span>GT</span></div>
             </section>
 
-            <section className="stats">
-              <article className="stat-card"><span>Total Members</span><strong>{memberCount}</strong><small>Member records</small></article>
-              <article className="stat-card"><span>Active Members</span><strong>{activeMemberCount}</strong><small>Currently active</small></article>
-              <article className="stat-card"><span>Other Modules</span><strong>4</strong><small>Planned features</small></article>
-              <article className="stat-card"><span>Backend</span><strong>{apiStatus === "Connected" ? "Live" : "—"}</strong><small>FastAPI connection</small></article>
-            </section>
+            {isAdmin ? (
+              <section className="stats">
+                <article className="stat-card"><span>Total Members</span><strong>{memberCount}</strong><small>Member records</small></article>
+                <article className="stat-card"><span>Active Members</span><strong>{activeMemberCount}</strong><small>Currently active</small></article>
+                <article className="stat-card"><span>Other Modules</span><strong>4</strong><small>Planned features</small></article>
+                <article className="stat-card"><span>Account role</span><strong>Admin</strong><small>Management access</small></article>
+              </section>
+            ) : (
+              <section className="panel user-welcome">
+                <p className="eyebrow">SIGNED IN</p>
+                <h3>Welcome, {currentUser.full_name}.</h3>
+                <p>Your account is active with the standard user role. Gym-wide member records are restricted to administrators.</p>
+                <span className="role-chip">USER ACCOUNT</span>
+              </section>
+            )}
 
-            <section className="content-grid" id="modules">
-              <article className="panel">
-                <div className="panel-header">
-                  <div><p className="eyebrow">CORE MODULES</p><h3>Project workspace</h3></div>
-                  <span className="planned">MVP scope</span>
-                </div>
-                {modules.map((item, index) => (
-                  <button
-                    className="module-row module-button"
-                    key={item.title}
-                    onClick={() => setActivePage(item.title)}
-                  >
-                    <span className={`module-icon color-${index}`}>{item.icon}</span>
-                    <div><strong>{item.title}</strong><p>{item.description}</p></div>
-                    <span className="module-state">{index === 0 ? "Available" : "Planned"}</span>
-                  </button>
-                ))}
-              </article>
-              <article className="panel api-panel">
-                <div className="panel-header">
-                  <div><p className="eyebrow">DEVELOPMENT CHECK</p><h3>Backend connection</h3></div>
-                  <span className="link-icon">↔</span>
-                </div>
-                <p className="api-copy">GymTrack uses FastAPI to handle requests from the React frontend.</p>
-                <div className="endpoint"><b>GET</b><code>/api/health</code><span>Health check</span></div>
-                <div className="endpoint"><b>GET</b><code>/api/members</code><span>Member list</span></div>
-                <button className="primary-button overview-button" onClick={() => setActivePage("Members")}>Open members</button>
-              </article>
-            </section>
+            {isAdmin && (
+              <section className="content-grid" id="modules">
+                <article className="panel">
+                  <div className="panel-header">
+                    <div><p className="eyebrow">CORE MODULES</p><h3>Project workspace</h3></div>
+                    <span className="planned">MVP scope</span>
+                  </div>
+                  {modules.map((item, index) => (
+                    <button
+                      className="module-row module-button"
+                      key={item.title}
+                      onClick={() => setActivePage(item.title)}
+                    >
+                      <span className={"module-icon color-" + index}>{item.icon}</span>
+                      <div><strong>{item.title}</strong><p>{item.description}</p></div>
+                      <span className="module-state">{index === 0 ? "Available" : "Planned"}</span>
+                    </button>
+                  ))}
+                </article>
+                <article className="panel api-panel">
+                  <div className="panel-header">
+                    <div><p className="eyebrow">DEVELOPMENT CHECK</p><h3>Backend connection</h3></div>
+                    <span className="link-icon">↔</span>
+                  </div>
+                  <p className="api-copy">GymTrack uses FastAPI to handle requests from the React frontend.</p>
+                  <div className="endpoint"><b>GET</b><code>/api/health</code><span>Health check</span></div>
+                  <div className="endpoint"><b>GET</b><code>/api/members</code><span>Admin only</span></div>
+                  <button className="primary-button overview-button" onClick={() => setActivePage("Members")}>Open members</button>
+                </article>
+              </section>
+            )}
           </>
         )}
 
-        {activePage === "Members" && (
+        {activePage === "Members" && isAdmin && (
           <MembersPage
             onApiStatusChange={setApiStatus}
             onMembersChange={updateMemberCounts}
@@ -158,7 +226,7 @@ export default function App() {
           </section>
         )}
 
-        <footer>GymTrack · CSE309 · React + TypeScript / FastAPI + SQLite</footer>
+        <footer>GymTrack · CSE309 · React + TypeScript / FastAPI</footer>
       </main>
     </div>
   );
