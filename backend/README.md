@@ -1,30 +1,31 @@
 # GymTrack Backend
 
-FastAPI REST API starter for GymTrack.
+FastAPI backend for GymTrack.
 
-## Run locally
+## Local setup
 
-From the repository root:
+From the repository root, configure \`.env\` using the root \`.env.example\`, then run:
 
-```bash
-python -m venv .venv
-```
-
-Activate it in Windows PowerShell with `.venv\Scripts\Activate.ps1`, or on macOS/Linux with `source .venv/bin/activate`.
-
-Install and run:
-
-```bash
+\`\`\`bash
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
-```
+\`\`\`
 
 API documentation: http://127.0.0.1:8000/docs
 
-## Starter endpoints
+## Main routes
 
-- `GET /api/health`
-- `GET /api/hello?name=YourName`
-- `GET /api/modules`
+- \`GET /api/health\`
+- \`POST /api/auth/register\`
+- \`POST /api/auth/login\`
+- \`POST /api/auth/refresh\`
+- \`POST /api/auth/logout\`
+- \`GET\` and \`PATCH /api/auth/me\`
+- \`POST /api/auth/change-password\`
+- \`GET /api/auth/sessions\`
+- \`DELETE /api/auth/sessions/{id}\`
+- \`/api/members/*\` (administrator role required)
 
-These are foundation/demo endpoints. Database persistence, authentication, and full CRUD will be developed in later project tasks.
+Public registration creates only normal user accounts. Create the first administrator with \`python -m backend.create_admin\` after configuring the database and secrets.
+
+Use a hosted PostgreSQL database for Vercel. The temporary \`/tmp\` SQLite fallback is not persistent and must not be used for the final assessed deployment.

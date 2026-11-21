@@ -57,3 +57,17 @@ button.nav-link:hover{background:#26364e;color:#fff}
 .overview-button{width:100%;margin-top:18px}
 .planned-panel h3{font:600 19px "Space Grotesk",sans-serif;margin:9px 0}
 .planned-panel p:not(.eyebrow){font-size:12px;color:#7a8599;line-height:1.7;margin-bottom:18px}
+
+
+/* Authentication */
+.auth-shell{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 18px;background:radial-gradient(circle at 15% 15%,#e8f3df 0,transparent 34%),#f5f7fb}
+.auth-card{width:min(100%,440px);background:#fff;border:1px solid #e5eaf0;border-radius:20px;padding:35px 38px;box-shadow:0 18px 60px rgba(25,40,60,.08)}
+.auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:38px}.auth-brand strong{display:block;font:700 17px "Space Grotesk",sans-serif;color:#172033}.auth-brand small{display:block;font-size:8px;letter-spacing:1.2px;color:#929bad;margin-top:4px}
+.auth-eyebrow{margin:0 0 9px}.auth-card h1{font:700 29px "Space Grotesk",sans-serif;letter-spacing:-1px;margin:0 0 8px;color:#172033}.auth-description{font-size:12px;line-height:1.7;color:#7b879a;margin:0 0 22px}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px;background:#f2f5f8;border-radius:10px;margin-bottom:19px}.auth-tab{border:0;background:transparent;padding:10px 8px;border-radius:7px;font-size:11px;font-weight:700;color:#778397}.auth-tab.selected{background:#fff;color:#26334a;box-shadow:0 1px 4px rgba(20,30,45,.09)}
+.auth-form label{display:block;font-size:10px;font-weight:700;color:#536077;margin:13px 0 6px}.auth-form input{display:block;width:100%;height:43px;padding:0 12px;border:1px solid #dfe5ed;border-radius:8px;background:#fff;outline:none;font-size:12px;color:#172033}.auth-form input:focus{border-color:#8dcc65;box-shadow:0 0 0 3px rgba(165,242,107,.15)}
+.auth-submit{width:100%;border:0;border-radius:9px;background:#a5f26b;color:#15251a;font-size:12px;font-weight:700;padding:13px;margin-top:19px}.auth-submit:hover{background:#b9ff84}.auth-submit:disabled{opacity:.6;cursor:wait}
+.auth-error{background:#fff0f0;color:#a43d3d;border-radius:7px;padding:10px 11px;font-size:10px;line-height:1.5;margin:13px 0 0}.auth-footnote{font-size:9px;line-height:1.7;color:#9aa3b1;text-align:center;margin:20px 0 0}.auth-copyright{color:#a1aaba;font-size:8px;letter-spacing:1.6px;margin:22px 0 0}.auth-loading{font-size:12px;color:#67748a}
+.sidebar-user{min-width:0;flex:1}.sidebar-user strong{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.signout-button{width:30px;height:30px;border:1px solid #35445c;border-radius:8px;background:#1d2a40;color:#c6cfdb;font-size:15px}.signout-button:hover{background:#2a3b56;color:#fff}
+.user-welcome{margin:18px 0;padding:26px}.user-welcome h3{font:600 20px "Space Grotesk",sans-serif;margin:9px 0}.user-welcome p:not(.eyebrow){font-size:12px;line-height:1.7;color:#778397;max-width:560px}.role-chip{display:inline-block;margin-top:7px;padding:6px 8px;border-radius:6px;background:#eef7e8;color:#578c3a;font-size:9px;font-weight:700;letter-spacing:.7px}
+@media(max-width:700px){.auth-card{padding:28px 23px}.sidebar-footer{display:flex}.sidebar-user strong{max-width:180px}}

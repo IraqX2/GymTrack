@@ -4,6 +4,7 @@ from sqlmodel import Session
 try:
     from backend.database import get_session
     from backend.schemas.member import MemberCreate, MemberRead, MemberUpdate
+    from backend.security import require_role
     from backend.services.member_service import (
         create_member_record,
         delete_member_record,
@@ -14,6 +15,7 @@ try:
 except ModuleNotFoundError:
     from database import get_session
     from schemas.member import MemberCreate, MemberRead, MemberUpdate
+    from security import require_role
     from services.member_service import (
         create_member_record,
         delete_member_record,
@@ -23,7 +25,13 @@ except ModuleNotFoundError:
     )
 
 
-router = APIRouter(prefix="/api/members", tags=["members"])
+# These records are gym-wide administrative data, so every operation is
+# protected on the server. Frontend button visibility is not authorization.
+router = APIRouter(
+    prefix="/api/members",
+    tags=["members"],
+    dependencies=[Depends(require_role("admin"))],
+)
 
 
 @router.post("", response_model=MemberRead, status_code=201)
