@@ -9,10 +9,10 @@ This file records the implementation that is present in the repository. It does 
 ## Implemented in this increment
 
 - React login and signup forms connected to the FastAPI backend.
-- User records with a database-stored \`user\` or \`admin\` role.
-- Public signup creates only the normal \`user\` role.
-- Argon2id password hashing with a server-side pepper from \`PASSWORD_PEPPER\`.
-- JWT access tokens signed with \`JWT_SECRET_KEY\`, with a 15-minute lifetime and user ID, role, and session ID claims.
+- User records with a database-stored `user` or `admin` role.
+- Public signup creates only the normal `user` role.
+- Argon2id password hashing with a server-side pepper from `PASSWORD_PEPPER`.
+- JWT access tokens signed with `JWT_SECRET_KEY`, with a 15-minute lifetime and user ID, role, and session ID claims.
 - HTTP-only refresh cookies, hashed refresh-token storage, token rotation, logout revocation, and refresh-session expiry.
 - Authenticated profile read/update, password change, and per-user session list/revocation endpoints.
 - A reusable server-side role dependency. All existing member CRUD endpoints require the administrator role.
@@ -32,7 +32,7 @@ This file records the implementation that is present in the repository. It does 
 
 ## Deployment warning
 
-A hosted PostgreSQL database must be configured with \`DATABASE_URL\`. The Vercel \`/tmp\` SQLite fallback is temporary and data may disappear between function instances or restarts. Authentication also requires two separate secrets of at least 32 characters: \`JWT_SECRET_KEY\` and \`PASSWORD_PEPPER\`.
+A hosted PostgreSQL database must be configured with `DATABASE_URL`. The Vercel `/tmp` SQLite fallback is temporary and data may disappear between function instances or restarts. Authentication also requires two separate secrets of at least 32 characters: `JWT_SECRET_KEY` and `PASSWORD_PEPPER`.
 
 ## Code defence preparation
 
