@@ -118,7 +118,7 @@ All member endpoints require an authenticated administrator:
 Run backend unit tests from the repository root:
 
 \`\`\`bash
-pytest backend/tests
+python -m pytest backend/tests
 \`\`\`
 
 ## Remaining assessment work
