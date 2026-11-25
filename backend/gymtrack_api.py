@@ -1062,7 +1062,7 @@ def list_groups(user: CURRENT, db: DB):
 
 
 @app.post("/api/groups", status_code=201)
-def create_group(data: GroupBody, user: CURRENT, db: DB, request: Request):
+def create_group(data: GroupBody, user: ADMIN, db: DB, request: Request):
     row = GymGroup(name=data.name, created_by=user.id)
     db.add(row); db.commit(); db.refresh(row)
     db.add(GymGroupMember(group_id=row.id, user_id=user.id, role="owner", can_create=True, can_edit=True, can_assign=True))
