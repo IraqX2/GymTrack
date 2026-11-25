@@ -619,8 +619,19 @@ def edit_member(member_id: int, data: MemberBody, user: ADMIN, db: DB, request: 
 @app.delete("/api/members/{member_id}", status_code=204)
 def remove_member(member_id: int, user: ADMIN, db: DB, request: Request):
     row = db.get(Member, member_id)
-    if not row: raise HTTPException(404, "Member not found")
-    db.delete(row); db.commit(); audit(db, request, "member_deleted", user, "member", member_id)
+    if not row:
+        raise HTTPException(404, "Member not found")
+    has_membership = db.exec(select(Membership).where(Membership.member_id == member_id)).first()
+    has_attendance = db.exec(select(Attendance).where(Attendance.member_id == member_id)).first()
+    has_workout = db.exec(select(WorkoutAssignment).where(WorkoutAssignment.member_id == member_id)).first()
+    if has_membership or has_attendance or has_workout:
+        raise HTTPException(
+            409,
+            "This member has gym history. Mark the member inactive instead of deleting their records.",
+        )
+    db.delete(row)
+    db.commit()
+    audit(db, request, "member_deleted", user, "member", member_id)
     return Response(status_code=204)
 
 
@@ -652,8 +663,16 @@ def edit_trainer(trainer_id: int, data: TrainerBody, user: ADMIN, db: DB, reques
 @app.delete("/api/trainers/{trainer_id}", status_code=204)
 def remove_trainer(trainer_id: int, user: ADMIN, db: DB, request: Request):
     row = db.get(Trainer, trainer_id)
-    if not row: raise HTTPException(404, "Trainer not found")
-    db.delete(row); db.commit(); audit(db, request, "trainer_deleted", user, "trainer", trainer_id)
+    if not row:
+        raise HTTPException(404, "Trainer not found")
+    assigned_work = db.exec(
+        select(WorkoutAssignment).where(WorkoutAssignment.trainer_id == trainer_id)
+    ).first()
+    if assigned_work:
+        raise HTTPException(409, "This trainer has assigned workouts. Mark the trainer inactive instead.")
+    db.delete(row)
+    db.commit()
+    audit(db, request, "trainer_deleted", user, "trainer", trainer_id)
     return Response(status_code=204)
 
 
@@ -705,9 +724,23 @@ def attendance(user: CURRENT, db: DB, limit: int = Query(100, ge=1, le=200)):
 
 @app.post("/api/attendance", status_code=201)
 def record_attendance(data: AttendanceBody, user: ADMIN, db: DB, request: Request):
-    if not db.get(Member, data.member_id): raise HTTPException(404, "Member not found")
+    member = db.get(Member, data.member_id)
+    if not member:
+        raise HTTPException(404, "Member not found")
+    if not member.is_active:
+        raise HTTPException(409, "This member is inactive.")
+    open_visit = db.exec(
+        select(Attendance).where(
+            Attendance.member_id == data.member_id,
+            Attendance.check_out.is_(None),
+        )
+    ).first()
+    if open_visit:
+        raise HTTPException(409, "This member is already checked in.")
     row = Attendance(member_id=data.member_id, notes=data.notes, recorded_by=user.id)
-    db.add(row); db.commit(); db.refresh(row)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
     audit(db, request, "attendance_recorded", user, "attendance", row.id)
     return row
 
@@ -715,8 +748,13 @@ def record_attendance(data: AttendanceBody, user: ADMIN, db: DB, request: Reques
 @app.patch("/api/attendance/{attendance_id}/checkout")
 def attendance_checkout(attendance_id: int, user: ADMIN, db: DB, request: Request):
     row = db.get(Attendance, attendance_id)
-    if not row: raise HTTPException(404, "Attendance record not found")
-    row.check_out = now(); db.add(row); db.commit()
+    if not row:
+        raise HTTPException(404, "Attendance record not found")
+    if row.check_out is not None:
+        raise HTTPException(409, "This attendance visit is already checked out.")
+    row.check_out = now()
+    db.add(row)
+    db.commit()
     audit(db, request, "attendance_checkout", user, "attendance", row.id)
     return row
 
@@ -751,8 +789,16 @@ def edit_workout_plan(plan_id: int, data: PlanBody, user: ADMIN, db: DB, request
 @app.delete("/api/workout-plans/{plan_id}", status_code=204)
 def remove_workout_plan(plan_id: int, user: ADMIN, db: DB, request: Request):
     row = db.get(WorkoutPlan, plan_id)
-    if not row: raise HTTPException(404, "Workout plan not found")
-    db.delete(row); db.commit(); audit(db, request, "workout_plan_deleted", user, "workout_plan", plan_id)
+    if not row:
+        raise HTTPException(404, "Workout plan not found")
+    assigned_work = db.exec(
+        select(WorkoutAssignment).where(WorkoutAssignment.plan_id == plan_id)
+    ).first()
+    if assigned_work:
+        raise HTTPException(409, "This workout plan has member assignments. Remove those assignments first.")
+    db.delete(row)
+    db.commit()
+    audit(db, request, "workout_plan_deleted", user, "workout_plan", plan_id)
     return Response(status_code=204)
 
 
@@ -834,6 +880,10 @@ def delete_group(group_id: int, user: CURRENT, db: DB, request: Request):
     group = db.get(GymGroup, group_id)
     if not group:
         raise HTTPException(404, "Group not found")
+    for task in db.exec(select(GymGroupTask).where(GymGroupTask.group_id == group_id)).all():
+        db.delete(task)
+    for group_member in db.exec(select(GymGroupMember).where(GymGroupMember.group_id == group_id)).all():
+        db.delete(group_member)
     db.delete(group)
     db.commit()
     audit(db, request, "group_deleted", user, "group", group_id, group.name)
@@ -882,15 +932,6 @@ def remove_group_member(group_id: int, target_id: int, user: CURRENT, db: DB, re
     if actor.role != "owner" and target_id != user.id: raise HTTPException(403, "Only owner can remove others")
     if target.role == "owner": raise HTTPException(400, "Owner cannot leave; delete the group instead")
     db.delete(target); db.commit(); audit(db, request, "group_member_removed", user, "group", group_id, str(target_id))
-    return Response(status_code=204)
-
-
-@app.delete("/api/groups/{group_id}", status_code=204)
-def delete_group(group_id: int, user: CURRENT, db: DB, request: Request):
-    row = get_group_member(db, group_id, user.id)
-    if row.role != "owner": raise HTTPException(403, "Only the owner can delete a group")
-    group = db.get(GymGroup, group_id); db.delete(group); db.commit()
-    audit(db, request, "group_deleted", user, "group", group_id)
     return Response(status_code=204)
 
 
