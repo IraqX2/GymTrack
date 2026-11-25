@@ -78,8 +78,11 @@ export async function restoreSession(): Promise<GymUser | null> {
     if (!accessToken) {
       const response = await raw("/api/auth/refresh", "POST", undefined, false);
       if (!response.ok) return null;
-      const result = await response.json() as { access_token: string };
+      const result = await response.json() as { access_token: string; user?: GymUser };
       saveToken(result.access_token);
+      // Refresh already returns the public user profile. Reuse it rather than
+      // opening a second database request immediately after a cold start.
+      if (result.user) return result.user;
     }
     return await api<GymUser>("/api/me");
   } catch {
