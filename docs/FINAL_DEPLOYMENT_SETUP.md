@@ -1,85 +1,63 @@
-# GymTrack final deployment and account setup
+# GymTrack deployment and account setup
 
-This document applies to the **GymTrack** project, not the instructor's Smarter Todo demo.
+## Database
 
-## What has been added to the GymTrack database
+The Vercel backend connects directly to the Supabase PostgreSQL database using the private connection string. The frontend does not use a Supabase client or database password.
 
-The migration is additive. It retains the existing `member`, `user` and `authsession` tables and their rows, and adds:
+The schema includes user accounts and sessions, member and trainer records, memberships, attendance, attendance requests, workout plans and assignments, shared groups, group permissions, shared tasks and activity logs.
 
-- trainers
-- memberships
-- attendance
-- workout plans and assignments
-- groups, group members and delegated permissions
-- shared group work
-- activity log and failed-login data
-- a link between each registered user and their own member profile
+## Vercel environment variables
 
-The migrations currently present in Supabase are `gymtrack_initial_schema`, `gymtrack_final_domain_and_auth`, and `gymtrack_user_member_and_group_work`.
-
-## Required Vercel environment variables
-
-Open Vercel → GymTrack → Settings → Environment Variables. Set the following for **Preview** and **Production**:
+Open Vercel → GymTrack → Settings → Environment Variables. Configure these variables for both Preview and Production:
 
 | Name | Purpose |
 |---|---|
-| `DATABASE_URL` | Supabase PostgreSQL connection string |
+| `DATABASE_URL` | Supabase PostgreSQL transaction-pooler URI |
 | `JWT_SECRET_KEY` | Random secret used to sign access tokens |
-| `PASSWORD_PEPPER` | Separate random secret mixed into passwords before Argon2 hashing |
-| `BOOTSTRAP_ADMIN_EMAIL` | Email address that is allowed to receive the first admin role at signup |
+| `PASSWORD_PEPPER` | Separate server-side value used by Argon2 password hashing |
+| `BOOTSTRAP_ADMIN_EMAIL` | Email address that may receive the initial administrator role |
 
-The current project already has `JWT_SECRET_KEY` and `PASSWORD_PEPPER`. The database connection variable is the missing deployment dependency.
+Keep every value private. Do not commit database credentials or put them in frontend code. Do not regenerate the password pepper after users have registered, because existing password hashes depend on it.
 
-Use the Supabase Dashboard → Project Settings → Database → Connection string. Prefer the Supavisor transaction pooler URL, using the PostgreSQL URI format, for Vercel serverless functions. Keep the database password private. Do not commit it, paste it into GitHub, or put it in frontend code.
+After changing Vercel environment variables, redeploy the project. The API health endpoint is `/api/health`; the API documentation is `/api/docs`.
 
-Generate two separate random secrets, for example from a terminal:
+## Local development
 
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(48))"
+From the repository root:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r backend/requirements.txt
+uvicorn backend.main:app --reload
 ```
 
-Run the command twice, once for `JWT_SECRET_KEY` and once for `PASSWORD_PEPPER`. Do not regenerate the pepper after users have passwords, because existing hashes depend on it.
+In a second terminal:
 
-After changing environment variables, redeploy the preview branch. The API should return `200` from `/api/health` and the documentation page should load at `/api/docs`.
-
-## First admin and demo accounts
-
-1. Add your chosen first-admin email to `BOOTSTRAP_ADMIN_EMAIL` in Vercel.
-2. Redeploy the preview branch.
-3. Sign up using that email. It will receive the `admin` role.
-4. Sign up at least one further admin and three regular user accounts.
-5. The second admin can be promoted by the first admin from Administration → Users.
-
-Alternatively, after the first account has signed up, the initial admin can be promoted once from the Supabase SQL editor:
-
-```sql
-UPDATE public."user"
-SET role = 'admin', updated_at = now()
-WHERE email = 'your-admin-email@example.com';
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
-Replace the example email with the account you created. Never put demo passwords in this repository. Put them only in the private PDF appendix required by the instructor.
+Set local `JWT_SECRET_KEY` and `PASSWORD_PEPPER` values before testing signup/login. Local development uses SQLite by default. To test against Supabase, set `DATABASE_URL` to the private PostgreSQL connection string in the local environment.
 
-## Cross-device persistence smoke test
+## Initial accounts
 
-After the API has a working database connection:
+The database currently contains five test accounts: two administrators and three regular users. Their credentials are stored separately from the source repository and must be provided to the instructor only through the required private submission fields/report.
 
-1. Sign in as an administrator on Computer A.
-2. Create a test member and a trainer.
-3. Create a membership, attendance record, workout plan and assignment.
-4. Open the same Vercel URL on Computer B and sign in as an authorised user.
-5. Confirm that the permitted records appear after refresh.
-6. Sign in as a different regular user and verify the first user's private member profile and assigned records are not visible.
-7. Add a registered user to a group, change their create/edit/assign grants, and test that an ungranted action receives HTTP 403.
+Do not store test passwords in this repository or use real personal accounts as demonstration data.
 
-Do not use real gym members' personal information until access control and deployment tests pass.
+## Cross-device persistence checks
 
-## Supabase Row Level Security warning
+1. Sign in as an administrator and create a member, membership, attendance entry, workout plan and assignment.
+2. Open the deployed application on another device and sign in as the intended member.
+3. Confirm that the member sees only their own membership, attendance and assigned workout records.
+4. Sign in as a different member and confirm that the first member's private records are not visible.
+5. Submit an attendance request as a member and review it as an administrator.
+6. Add a registered user to a group and grant selected create/edit/assign permissions.
+7. Confirm an action outside the member's permissions is rejected by the API.
 
-The current Supabase project inspection reported Row Level Security disabled on the public tables. This is a critical warning because Supabase's publishable/anon API roles can access exposed public tables when grants permit it.
+## Database security
 
-The GymTrack frontend talks to FastAPI, not directly to Supabase, and the backend should use the private PostgreSQL connection string. Still, enable RLS and verify grants/policies for every public table before treating the database as production-safe. Do not merely enable RLS without understanding the policies: that can block API access for roles that do not bypass RLS. Keep any service-role key and database password on the server only.
-
-## Current implementation boundaries
-
-The frontend contains login/signup, profile/session screens, role-based navigation, gym record modules, groups and admin screens. The backend has matching API routes and database models. This is not a claim that every instructor acceptance criterion has passed: runtime testing depends on the Vercel `DATABASE_URL`, and automated tests and final evidence screenshots still need to be completed.
+A Supabase inspection reported Row Level Security disabled on existing public tables. The GymTrack frontend calls FastAPI rather than the Supabase Data API, and the backend uses the private PostgreSQL connection. Still, review table grants and RLS policies before using real personal data. Enabling RLS without accounting for the backend database role can block expected backend access.
