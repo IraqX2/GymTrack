@@ -736,10 +736,3 @@ export default function App(){
   </div>;
 }
 
-.gt-span-two{grid-column:1/-1}
-.gt-help{display:block;color:#8d98a7;font-size:9px;margin-top:4px;font-weight:400}
-.gt-table-subline{display:block;color:#8e98a8;font-size:9px;margin-top:3px}
-.gt-request-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #edf0f4;padding:12px 0}
-.gt-request-row strong{display:block;font-size:11px;color:#3b4960}
-.gt-request-row small{display:block;margin-top:4px;color:#8a95a6;font-size:9px}
-@media(max-width:760px){.gt-span-two{grid-column:1}.gt-request-row{align-items:flex-start;flex-direction:column}}
