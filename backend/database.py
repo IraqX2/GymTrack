@@ -7,16 +7,17 @@ from sqlmodel import Session, SQLModel, create_engine
 
 configured_database_url = os.getenv("DATABASE_URL")
 
-# Vercel Functions have a read-only deployment filesystem. When no hosted
-# DATABASE_URL is configured, use /tmp only as a temporary demo fallback.
-# Local development continues to use the persistent project SQLite file.
-if configured_database_url:
-    raw_database_url = configured_database_url
-elif os.getenv("VERCEL") == "1":
-    raw_database_url = "sqlite:////tmp/gymtrack.db"
-    print("DATABASE_URL is not set; using ephemeral /tmp SQLite on Vercel.")
-else:
-    raw_database_url = "sqlite:///./gymtrack.db"
+# A Vercel Function can be restarted or run in another instance at any time.
+# Its local filesystem (including /tmp) is not a shared, durable database.
+# Fail fast instead of silently losing member records when production is misconfigured.
+if not configured_database_url and os.getenv("VERCEL") == "1":
+    raise RuntimeError(
+        "DATABASE_URL is required on Vercel. Configure a persistent PostgreSQL "
+        "database (for example, Supabase) in the project's Environment Variables."
+    )
+
+# Local development uses SQLite. Production must provide a hosted database URL.
+raw_database_url = configured_database_url or "sqlite:///./gymtrack.db"
 
 # Supabase provides PostgreSQL URLs. Use psycopg 3 explicitly so the same
 # SQLModel code works locally with SQLite and in Vercel with PostgreSQL.
