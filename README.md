@@ -1,30 +1,26 @@
 # GymTrack
 
-GymTrack is a gym-management application for members, trainers, memberships, attendance, workout plans and staff collaboration. This is the CSE309 final-project codebase.
+GymTrack is a gym-management application for members, trainers, memberships, attendance, workout plans and staff collaboration.
 
 ## Technology
 
-- Frontend: React 19, TypeScript and Vite
+- Frontend: React, TypeScript and Vite
 - Backend: Python, FastAPI and SQLModel
-- Database: SQLite for local development; PostgreSQL (Supabase) for Vercel
-- Authentication: Argon2 password hashing, JWT access tokens and rotating HttpOnly refresh sessions
+- Database: SQLite for local development; PostgreSQL on Supabase for deployment
+- Authentication: Argon2 password hashing, signed JWT access tokens and rotating HttpOnly refresh sessions
 - Hosting: Vercel
 
-## Current features
+## Features
 
-- Account signup and login
-- Personal profile and password change
-- JWT access authentication, refresh and logout
-- Short-lived access tokens and HttpOnly refresh cookies
-- User and administrator roles, server-side checks and private member-profile ownership
-- Admin dashboard statistics, account role changes, ban/unban, session revocation, activity and security views, CSV exports
-- Member records (create, list, view, update, delete)
-- Trainer records
-- Membership records and status
-- Attendance check-in/check-out
-- Workout plan CRUD and member/trainer assignment
-- Groups with owner/member roles, create/edit/assign grants and shared group work
-- Activity records with timestamps, IP address and browser details
+- Account signup, login, profile updates, password changes and session management
+- Admin and member roles with backend authorization and member-owned records
+- Admin dashboard with account management, activity/security views and CSV exports
+- Member and trainer records
+- Membership plans with dates, price and status
+- Attendance check-in/check-out and member attendance history
+- Member attendance requests with an administrator approval/rejection workflow
+- Workout plan management and member/trainer assignments
+- Shared teams with owner-managed membership and separate create, edit and assign permissions
 
 ## Project structure
 
@@ -32,7 +28,7 @@ GymTrack is a gym-management application for members, trainers, memberships, att
 GymTrack/
 ├── frontend/       React + TypeScript UI
 ├── backend/        FastAPI application and SQLModel database access
-├── docs/           Project requirements and deployment instructions
+├── docs/           Requirements and deployment documentation
 └── vercel.json     Vercel frontend/API routing
 ```
 
@@ -40,69 +36,70 @@ GymTrack/
 
 Requirements: Python 3.10+ and Node.js 20+.
 
-Backend, from the repository root:
+From the repository root, create and activate a virtual environment:
 
-```bash
+```powershell
 python -m venv .venv
-# Windows PowerShell:
-.venv\\Scripts\\Activate.ps1
-# macOS/Linux:
-# source .venv/bin/activate
+.venv\Scripts\Activate.ps1
 pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
 ```
 
-API docs: http://127.0.0.1:8000/docs
+Start the frontend in a second terminal:
 
-Frontend, in another terminal:
-
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Open the Vite URL (usually http://localhost:5173).
+Open the Vite URL shown in the terminal, usually http://localhost:5173. The FastAPI API docs are at http://127.0.0.1:8000/docs.
 
-Without environment variables, local development uses `./gymtrack.db` (SQLite). For local testing, set `JWT_SECRET_KEY` and `PASSWORD_PEPPER` to separate random values. To test with Supabase locally, set `DATABASE_URL` to the private PostgreSQL connection string.
+Local development uses `./gymtrack.db` when `DATABASE_URL` is not configured. Set separate `JWT_SECRET_KEY` and `PASSWORD_PEPPER` values for local authentication. To use the hosted database locally, set `DATABASE_URL` to the private PostgreSQL connection string.
 
-## Deploy to Vercel
+## Deployment
 
-The backend **requires** a persistent database URL in Vercel. It intentionally does not fall back to `/tmp` SQLite, because a serverless filesystem is not durable or shared between function instances.
+The Vercel backend requires a persistent PostgreSQL connection string. It does not use temporary SQLite storage on Vercel.
 
-Set these variables for Preview and Production:
+Set the following server-side environment variables for Preview and Production:
 
-- `DATABASE_URL`: Supabase PostgreSQL connection string
-- `JWT_SECRET_KEY`: random JWT signing secret
-- `PASSWORD_PEPPER`: a separate random server-side pepper
-- `BOOTSTRAP_ADMIN_EMAIL`: email address that may receive the first admin role during signup
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Supabase PostgreSQL connection string using the pooler |
+| `JWT_SECRET_KEY` | JWT signing secret |
+| `PASSWORD_PEPPER` | Separate password-hashing pepper |
+| `BOOTSTRAP_ADMIN_EMAIL` | Account permitted to receive the initial administrator role |
 
-See [Final deployment setup](docs/FINAL_DEPLOYMENT_SETUP.md) for setup, initial accounts, database and smoke-test instructions.
+Never commit these values or put them in frontend code. See [Final deployment setup](docs/FINAL_DEPLOYMENT_SETUP.md).
 
-## Current API groups
+## Main API routes
 
-| Area | Main routes |
+| Area | Routes |
 |---|---|
 | Authentication | `/api/auth/signup`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` |
-| Profile & sessions | `/api/me`, `/api/auth/sessions` |
+| Profile and sessions | `/api/me`, `/api/auth/sessions` |
 | Members | `/api/members` |
 | Trainers | `/api/trainers` |
 | Memberships | `/api/memberships` |
 | Attendance | `/api/attendance` |
+| Attendance requests | `/api/attendance/requests` |
 | Workout plans | `/api/workout-plans`, `/api/workout-assignments` |
-| Groups | `/api/groups` |
-| Admin | `/api/admin/stats`, `/api/admin/users`, `/api/admin/activity`, `/api/admin/security` |
+| Shared teams | `/api/groups` |
+| Administration | `/api/admin/stats`, `/api/admin/users`, `/api/admin/activity`, `/api/admin/security` |
 
-API documentation is available at `/api/docs` when running on Vercel.
+The deployed API documentation is available at `/api/docs`.
 
-## Important security notes
+## Access rules
 
-- Never place the database password, JWT secret, password pepper or Supabase service-role key in frontend code or Git.
-- The first admin account must be explicitly designated; other signups receive the regular `user` role.
-- Personal member records are linked to the account that owns them. Regular users only see their own profile and related records.
-- The current Supabase project inspection reported RLS disabled on public tables. Review the Supabase RLS warning and configure defense-in-depth before using real personal data.
-- The project should only be treated as ready for real records after the preview and production smoke tests pass.
+- The frontend does not connect directly to PostgreSQL. It calls the FastAPI backend.
+- Administrator-only operations are checked by FastAPI, not just hidden in React.
+- A member can read only their own member, membership, attendance and workout records.
+- Only an administrator can create a team. Its owner controls membership and grants.
+- Team members can create, edit or assign shared tasks only when the corresponding permission is granted. These permissions are checked by the backend.
+- Member attendance requests stay pending until an administrator approves or rejects them.
 
-## Project status
+## Deployment and security notes
 
-This repository has a preview implementation of the final-project features. A successful Vercel build is not the same as a working API: the deployed backend needs `DATABASE_URL` configured before login, records and sessions can operate. Automated tests, all final acceptance checks and the submission report/evidence still need completion.
+The application uses the private PostgreSQL connection from the backend. The Supabase project inspection also identified disabled Row Level Security on existing public tables. The frontend does not use the Supabase Data API, but the RLS and grants configuration still needs a deliberate security review before storing real member information. Do not enable RLS without considering the backend database role and required access.
+
+A successful build confirms that the source compiles. It does not replace testing authentication, record operations, ownership restrictions, team permissions and data persistence on the deployed URL.
