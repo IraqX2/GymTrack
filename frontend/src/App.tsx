@@ -626,36 +626,148 @@ function Assignments(){
   </section>;
 }
 
-function GroupsPage(){
+function GroupsPage({user}:{user:GymUser}){
   const [groups,setGroups]=useState<GymRow[]>([]),[selected,setSelected]=useState<GymRow|null>(null),[members,setMembers]=useState<GymRow[]>([]),[work,setWork]=useState<GymRow[]>([]);
   const [name,setName]=useState(""),[email,setEmail]=useState(""),[title,setTitle]=useState("");
-  const [grants,setGrants]=useState({can_create:true,can_edit:true,can_assign:false}),[assigned,setAssigned]=useState(0),[error,setError]=useState(""),[message,setMessage]=useState("");
-  const loadGroups=useCallback(async()=>{try{setGroups(await api<GymRow[]>("/api/groups"));}catch(e){setError(e instanceof Error?e.message:"Could not load groups");}},[]);
-  const loadDetail=useCallback(async(group:GymRow)=>{setSelected(group);try{const [m,w]=await Promise.all([api<GymRow[]>("/api/groups/"+group.id+"/members"),api<GymRow[]>("/api/groups/"+group.id+"/work")]);setMembers(m);setWork(w);}catch(e){setError(e instanceof Error?e.message:"Could not load group details");}},[]);
-  useEffect(()=>{void loadGroups();},[loadGroups]);
-  async function create(event:FormEvent){event.preventDefault();try{await api("/api/groups","POST",{name});setName("");setMessage("Group created.");await loadGroups();}catch(e){setError(e instanceof Error?e.message:"Could not create group");}}
-  async function renameSelected(){if(!selected)return;const next=window.prompt("New group name",selected.name);if(next===null||next.trim().length<2)return;try{await api("/api/groups/"+selected.id,"PATCH",{name:next.trim()});const updated={...selected,name:next.trim()};await loadGroups();await loadDetail(updated);}catch(e){setError(e instanceof Error?e.message:"Could not rename group");}}
-  async function deleteSelected(){if(!selected||!window.confirm("Delete this group and its shared work?"))return;try{await api("/api/groups/"+selected.id,"DELETE");setSelected(null);setMembers([]);setWork([]);await loadGroups();setMessage("Group deleted.");}catch(e){setError(e instanceof Error?e.message:"Could not delete group");}}
-  async function invite(event:FormEvent){event.preventDefault();if(!selected)return;try{await api("/api/groups/"+selected.id+"/members","POST",{email,...grants});setEmail("");setMessage("Group member added.");await loadDetail(selected);}catch(e){setError(e instanceof Error?e.message:"Could not add user");}}
-  async function permission(row:GymRow,key:"can_create"|"can_edit"|"can_assign"){if(!selected)return;try{await api("/api/groups/"+selected.id+"/members/"+row.user_id,"PATCH",{can_create:key==="can_create"?!row.can_create:row.can_create,can_edit:key==="can_edit"?!row.can_edit:row.can_edit,can_assign:key==="can_assign"?!row.can_assign:row.can_assign});await loadDetail(selected);}catch(e){setError(e instanceof Error?e.message:"Could not change permission");}}
-  async function removeMember(row:GymRow){if(!selected||!window.confirm("Remove this member?"))return;try{await api("/api/groups/"+selected.id+"/members/"+row.user_id,"DELETE");await loadDetail(selected);}catch(e){setError(e instanceof Error?e.message:"Could not remove member");}}
-  async function addWork(event:FormEvent){event.preventDefault();if(!selected)return;try{await api("/api/groups/"+selected.id+"/work","POST",{title,assigned_to:assigned||null});setTitle("");setAssigned(0);await loadDetail(selected);}catch(e){setError(e instanceof Error?e.message:"Could not create team task");}}
-  async function toggle(row:GymRow){if(!selected)return;try{await api("/api/groups/"+selected.id+"/work/"+row.id,"PATCH",{is_completed:!row.is_completed});await loadDetail(selected);}catch(e){setError(e instanceof Error?e.message:"Could not update task");}}
-  async function deleteWork(row:GymRow){if(!selected||!window.confirm("Delete this group task?"))return;try{await api("/api/groups/"+selected.id+"/work/"+row.id,"DELETE");await loadDetail(selected);}catch(e){setError(e instanceof Error?e.message:"Could not delete task");}}
-  return <div className="gt-page-stack"><section className="gt-section-title"><div><p className="gt-eyebrow">TEAM WORKSPACE</p><h2>Groups</h2><p className="gt-muted">Share operational work with members and staff using permissions.</p></div></section>
+  const [grants,setGrants]=useState({can_create:true,can_edit:false,can_assign:false}),[assigned,setAssigned]=useState(0),[error,setError]=useState(""),[message,setMessage]=useState("");
+  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false);
+  const loadGroups=useCallback(async()=>{
+    setLoading(true);
+    try{
+      const result=await api<GymRow[]>("/api/groups");
+      setGroups(result);
+      if(selected){
+        const refreshed=result.find(group=>group.id===selected.id);
+        if(refreshed)setSelected(refreshed);
+        else{setSelected(null);setMembers([]);setWork([]);}
+      }
+      setError("");
+    }catch(e){setError(e instanceof Error?e.message:"Could not load groups");}
+    finally{setLoading(false);}
+  },[selected?.id]);
+  const loadDetail=useCallback(async(group:GymRow)=>{
+    setSelected(group);
+    try{
+      const [m,w]=await Promise.all([
+        api<GymRow[]>("/api/groups/"+group.id+"/members"),
+        api<GymRow[]>("/api/groups/"+group.id+"/work")
+      ]);
+      setMembers(m);setWork(w);setError("");
+    }catch(e){setError(e instanceof Error?e.message:"Could not load group details");}
+  },[]);
+  useEffect(()=>{void loadGroups();},[]);
+  const myGroupRole=selected?.my_role;
+  const myMembership=members.find(row=>row.user_id===user.id);
+  const canCreateWork=myGroupRole==="owner"||Boolean(myMembership?.can_create);
+  const canEditWork=myGroupRole==="owner"||Boolean(myMembership?.can_edit);
+  const canAssignWork=myGroupRole==="owner"||Boolean(myMembership?.can_assign);
+
+  async function create(event:FormEvent){
+    event.preventDefault();if(saving)return;setSaving(true);setError("");
+    try{
+      const created=await api<GymRow>("/api/groups","POST",{name});
+      setName("");setMessage("Team created.");
+      await loadGroups();await loadDetail({...created,my_role:"owner"});
+    }catch(e){setError(e instanceof Error?e.message:"Could not create team");}
+    finally{setSaving(false);}
+  }
+  async function renameSelected(){
+    if(!selected)return;
+    const next=window.prompt("New group name",selected.name);
+    if(next===null||next.trim().length<2)return;
+    try{
+      await api("/api/groups/"+selected.id,"PATCH",{name:next.trim()});
+      const updated={...selected,name:next.trim()};
+      setSelected(updated);await loadGroups();await loadDetail(updated);
+    }catch(e){setError(e instanceof Error?e.message:"Could not rename group");}
+  }
+  async function deleteSelected(){
+    if(!selected||!window.confirm("Delete this group and its shared work?"))return;
+    try{
+      await api("/api/groups/"+selected.id,"DELETE");
+      setSelected(null);setMembers([]);setWork([]);await loadGroups();setMessage("Team deleted.");
+    }catch(e){setError(e instanceof Error?e.message:"Could not delete group");}
+  }
+  async function invite(event:FormEvent){
+    event.preventDefault();if(!selected)return;
+    try{
+      await api("/api/groups/"+selected.id+"/members","POST",{email,...grants});
+      setEmail("");setMessage("Member added.");await loadDetail(selected);
+    }catch(e){setError(e instanceof Error?e.message:"Could not add member");}
+  }
+  async function permission(row:GymRow,key:"can_create"|"can_edit"|"can_assign"){
+    if(!selected||selected.my_role!=="owner")return;
+    try{
+      await api("/api/groups/"+selected.id+"/members/"+row.user_id,"PATCH",{
+        can_create:key==="can_create"?!row.can_create:row.can_create,
+        can_edit:key==="can_edit"?!row.can_edit:row.can_edit,
+        can_assign:key==="can_assign"?!row.can_assign:row.can_assign
+      });
+      await loadDetail(selected);
+    }catch(e){setError(e instanceof Error?e.message:"Could not change permission");}
+  }
+  async function removeMember(row:GymRow){
+    if(!selected||!window.confirm("Remove this member from the team?"))return;
+    try{
+      await api("/api/groups/"+selected.id+"/members/"+row.user_id,"DELETE");
+      if(row.user_id===user.id){setSelected(null);setMembers([]);setWork([]);await loadGroups();}
+      else await loadDetail(selected);
+    }catch(e){setError(e instanceof Error?e.message:"Could not remove member");}
+  }
+  async function addWork(event:FormEvent){
+    event.preventDefault();if(!selected||saving)return;
+    setSaving(true);setError("");
+    try{
+      await api("/api/groups/"+selected.id+"/work","POST",{title,assigned_to:canAssignWork?(assigned||null):null});
+      setTitle("");setAssigned(0);setMessage("Shared task created.");await loadDetail(selected);
+    }catch(e){setError(e instanceof Error?e.message:"Could not create shared task");}
+    finally{setSaving(false);}
+  }
+  async function toggle(row:GymRow){
+    if(!selected)return;
+    try{await api("/api/groups/"+selected.id+"/work/"+row.id,"PATCH",{is_completed:!row.is_completed});await loadDetail(selected);}
+    catch(e){setError(e instanceof Error?e.message:"Could not update task");}
+  }
+  async function deleteWork(row:GymRow){
+    if(!selected||selected.my_role!=="owner"||!window.confirm("Delete this shared task?"))return;
+    try{await api("/api/groups/"+selected.id+"/work/"+row.id,"DELETE");await loadDetail(selected);}
+    catch(e){setError(e instanceof Error?e.message:"Could not delete task");}
+  }
+
+  return <div className="gt-page-stack">
+    <section className="gt-section-title"><div><p className="gt-eyebrow">TEAM WORKSPACE</p><h2>Groups</h2><p className="gt-muted">Admins create teams and grant members permission to create, edit or assign shared tasks.</p></div></section>
     {error&&<div className="gt-alert error">{error}</div>}{message&&<div className="gt-alert success">{message}</div>}
-    <div className="gt-two-col"><section className="gt-panel"><h3>Create a group</h3><form className="gt-inline-form" onSubmit={create}><input value={name} onChange={e=>setName(e.target.value)} placeholder="New group name" required minLength={2}/><button className="gt-primary">Create group</button></form><h3 className="gt-subheading">Your groups</h3>{groups.length?groups.map(g=><button className={selected?.id===g.id?"gt-group-choice selected":"gt-group-choice"} key={g.id} onClick={()=>void loadDetail(g)}><span><strong>{g.name}</strong><small>Group #{g.id}</small></span><em>{g.my_role}</em></button>):<p className="gt-empty">No group joined yet.</p>}</section>
-      <section className="gt-panel">{!selected?<div className="gt-empty-state"><strong>Select a group</strong><p>Choose a team to see its members and shared work.</p></div>:<>
-        <div className="gt-panel-head"><div><p className="gt-eyebrow">SELECTED TEAM</p><h3>{selected.name}</h3></div><div className="gt-panel-tools"><span className="gt-role-tag">{selected.my_role}</span>{selected.my_role==="owner"&&<><button className="gt-secondary" onClick={()=>void renameSelected()}>Rename</button><button className="gt-danger-outline" onClick={()=>void deleteSelected()}>Delete group</button></>}</div></div>
-        <h4>Members and permissions</h4>{members.map(row=><div className="gt-member-row" key={row.user_id}><div><strong>{row.full_name}</strong><small>{row.email} · {row.role}</small></div>{row.role==="owner"?<span className="gt-status active">Owner</span>:<div className="gt-permissions">{(["can_create","can_edit","can_assign"] as const).map(key=><label key={key}><input type="checkbox" checked={Boolean(row[key])} onChange={()=>void permission(row,key)}/>{key.replace("can_","")}</label>)}<button className="danger" onClick={()=>void removeMember(row)}>Remove</button></div>}</div>)}
-        {selected.my_role==="owner"&&<form className="gt-invite-form" onSubmit={invite}><h4>Add a registered user</h4><input type="email" placeholder="User email" value={email} onChange={e=>setEmail(e.target.value)} required/><div className="gt-permissions">{(["can_create","can_edit","can_assign"] as const).map(key=><label key={key}><input type="checkbox" checked={grants[key]} onChange={e=>setGrants(old=>({...old,[key]:e.target.checked}))}/>{key.replace("can_","")}</label>)}</div><button className="gt-primary">Add member</button></form>}
-        <h4 className="gt-subheading">Shared team work</h4><form className="gt-inline-form" onSubmit={addWork}><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Task or duty" required/><select value={assigned} onChange={e=>setAssigned(Number(e.target.value))}><option value={0}>Unassigned</option>{members.map(row=><option value={row.user_id} key={row.user_id}>{row.full_name}</option>)}</select><button className="gt-primary">Add</button></form>
-        {work.map(row=><div className="gt-work-row" key={row.id}><label><input type="checkbox" checked={row.is_completed} onChange={()=>void toggle(row)}/><span className={row.is_completed?"completed":""}>{row.title}</span></label><small>{members.find(m=>m.user_id===row.assigned_to)?.full_name||"Unassigned"}</small>{selected.my_role==="owner"&&<button className="danger" onClick={()=>void deleteWork(row)}>Delete</button>}</div>)}
-      </>}</section></div>
+    <div className="gt-two-col">
+      <section className="gt-panel">
+        {user.role==="admin"&&<><h3>Create a team</h3><form className="gt-inline-form" onSubmit={create}><input value={name} onChange={e=>setName(e.target.value)} placeholder="Team name" required minLength={2}/><button className="gt-primary" disabled={saving}>{saving?"Creating…":"Create team"}</button></form></>}
+        <h3 className={user.role==="admin"?"gt-subheading":""}>Your groups</h3>
+        {loading?<p className="gt-empty">Loading groups…</p>:groups.length?groups.map(g=><button className={selected?.id===g.id?"gt-group-choice selected":"gt-group-choice"} key={g.id} onClick={()=>void loadDetail(g)}><span><strong>{g.name}</strong><small>Group #{g.id}</small></span><em>{g.my_role}</em></button>):<p className="gt-empty">You have not been added to a team yet.</p>}
+      </section>
+      <section className="gt-panel">
+        {!selected?<div className="gt-empty-state"><strong>Select a group</strong><p>Choose a team to see its members, permissions and shared tasks.</p></div>:<>
+          <div className="gt-panel-head"><div><p className="gt-eyebrow">SELECTED TEAM</p><h3>{selected.name}</h3></div><div className="gt-panel-tools"><span className="gt-role-tag">{selected.my_role}</span>{selected.my_role==="owner"&&<><button className="gt-secondary" onClick={()=>void renameSelected()}>Rename</button><button className="gt-danger-outline" onClick={()=>void deleteSelected()}>Delete team</button></>}</div></div>
+          <h4>Members and permissions</h4>
+          {members.map(row=><div className="gt-member-row" key={row.user_id}>
+            <div><strong>{row.full_name}{row.user_id===user.id?" (You)":""}</strong><small>{row.email} · {row.role}</small></div>
+            {row.role==="owner"?<span className="gt-status active">Owner</span>:selected.my_role==="owner"?
+              <div className="gt-permissions">{(["can_create","can_edit","can_assign"] as const).map(key=><label key={key}><input type="checkbox" checked={Boolean(row[key])} onChange={()=>void permission(row,key)}/>{key.replace("can_","")}</label>)}<button className="danger" onClick={()=>void removeMember(row)}>Remove</button></div>:
+              <div className="gt-permissions"><span className={row.can_create?"gt-status active":"gt-status"}>Create {row.can_create?"allowed":"off"}</span><span className={row.can_edit?"gt-status active":"gt-status"}>Edit {row.can_edit?"allowed":"off"}</span><span className={row.can_assign?"gt-status active":"gt-status"}>Assign {row.can_assign?"allowed":"off"}</span>{row.user_id===user.id&&<button className="danger" onClick={()=>void removeMember(row)}>Leave team</button>}</div>}
+          </div>)}
+          {selected.my_role==="owner"&&<form className="gt-invite-form" onSubmit={invite}><h4>Add a registered user</h4><input type="email" placeholder="User email" value={email} onChange={e=>setEmail(e.target.value)} required/><div className="gt-permissions">{(["can_create","can_edit","can_assign"] as const).map(key=><label key={key}><input type="checkbox" checked={grants[key]} onChange={e=>setGrants(old=>({...old,[key]:e.target.checked}))}/>{key.replace("can_","")}</label>)}</div><button className="gt-primary">Add member</button></form>}
+          <h4 className="gt-subheading">Shared team work</h4>
+          {canCreateWork&&<form className="gt-inline-form" onSubmit={addWork}><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Task or duty" required/>{canAssignWork&&<select value={assigned} onChange={e=>setAssigned(Number(e.target.value))}><option value={0}>Unassigned</option>{members.map(row=><option value={row.user_id} key={row.user_id}>{row.full_name}</option>)}</select>}<button className="gt-primary" disabled={saving}>{saving?"Saving…":"Add task"}</button></form>}
+          {!canCreateWork&&selected.my_role!=="owner"&&<p className="gt-muted">You can view shared tasks. Ask the team owner for additional permissions when needed.</p>}
+          {!work.length?<p className="gt-empty">No shared tasks yet.</p>:work.map(row=>{
+            const canUpdate=selected.my_role==="owner"||row.created_by===user.id||canEditWork;
+            return <div className="gt-work-row" key={row.id}><label><input type="checkbox" checked={row.is_completed} disabled={!canUpdate} onChange={()=>void toggle(row)}/><span className={row.is_completed?"completed":""}>{row.title}</span></label><small>{members.find(m=>m.user_id===row.assigned_to)?.full_name||"Unassigned"}</small>{selected.my_role==="owner"&&<button className="danger" onClick={()=>void deleteWork(row)}>Delete</button>}</div>;
+          })}
+        </>}
+      </section>
+    </div>
   </div>;
 }
 
-function Administration(){
+function Administration({user}:{user:GymUser}){
   const [tab,setTab]=useState<"Users"|"Groups"|"Activity"|"Security">("Users");
   const [users,setUsers]=useState<GymRow[]>([]),[logs,setLogs]=useState<GymRow[]>([]);
   const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[]}>({failed_logins_24h:0,events:[]});
@@ -669,7 +781,7 @@ function Administration(){
     <div className="gt-tabbar">{(["Users","Groups","Activity","Security"] as const).map(item=><button className={tab===item?"active":""} key={item} onClick={()=>setTab(item)}>{item}</button>)}</div>
     {error&&<div className="gt-alert error">{error}</div>}
     <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/>}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
-      {tab==="Groups"&&<GroupsPage/>}
+      {tab==="Groups"&&<GroupsPage user={user}/>}
       {tab==="Users"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td>{row.role}</td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button disabled={row.is_banned} onClick={()=>void changeRole(row)}>{row.role==="admin"?"Demote":"Promote"}</button><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
       {tab==="Security"&&<><div className="gt-security-count"><strong>{security.failed_logins_24h}</strong><span>failed or blocked login events in the last 24 hours</span></div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>Email</th><th>Event</th><th>IP</th><th>Browser</th></tr></thead><tbody>{security.events.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.ip_address||"—"}</td><td>{row.user_agent||"—"}</td></tr>)}</tbody></table></div></>}</section>
@@ -725,11 +837,11 @@ export default function App(){
       {user.role==="admin"&&page==="People"&&<PeoplePage user={user}/>}
       {user.role==="admin"&&page==="Operations"&&<OperationsPage/>}
       {user.role==="admin"&&page==="Workouts"&&<DataModule name="Workout Plans" user={user}/>}
-      {user.role==="user"&&page==="Groups"&&<GroupsPage/>}
+      {user.role==="user"&&page==="Groups"&&<GroupsPage user={user}/>}
       {page==="My Membership"&&user.role==="user"&&<MemberPortalPage section="My Membership" user={user}/>}
       {page==="My Attendance"&&user.role==="user"&&<MemberPortalPage section="My Attendance" user={user}/>}
       {page==="My Workouts"&&user.role==="user"&&<MemberPortalPage section="My Workouts" user={user}/>}
-      {page==="Administration"&&user.role==="admin"&&<Administration/>}
+      {page==="Administration"&&user.role==="admin"&&<Administration user={user}/>}
       {page==="Profile"&&<Profile user={user} onUpdate={setUser} onLogout={()=>void signOut()}/>}
       <footer>GymTrack · CSE309 · React + TypeScript / FastAPI / PostgreSQL</footer>
     </main>
