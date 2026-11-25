@@ -37,7 +37,7 @@ else:
     engine = create_engine(
         DATABASE_URL,
         poolclass=NullPool,
-        connect_args={"prepare_threshold": None, "sslmode": "require"},
+        connect_args={"prepare_threshold": None, "sslmode": "require", "connect_timeout": 5},
     )
 
 
