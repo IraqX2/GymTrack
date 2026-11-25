@@ -27,26 +27,6 @@ const modules: Record<string, Module> = {
     ],
     columns: ["full_name", "email", "phone", "specialization", "is_active"],
   },
-  Memberships: {
-    title: "Memberships", path: "/api/memberships", create: true, edit: true, remove: true, adminOnly: true,
-    fields: [
-      { key: "member_id", label: "Member ID", type: "number", required: true },
-      { key: "plan_name", label: "Plan name", required: true },
-      { key: "start_date", label: "Start date", type: "date", required: true },
-      { key: "end_date", label: "End date", type: "date", required: true },
-      { key: "price", label: "Price", type: "number", required: true },
-      { key: "status", label: "Status", type: "select", options: ["active", "expired", "cancelled"] },
-    ],
-    columns: ["member_id", "plan_name", "start_date", "end_date", "price", "status"],
-  },
-  Attendance: {
-    title: "Attendance", path: "/api/attendance", create: true, adminOnly: true,
-    fields: [
-      { key: "member_id", label: "Member ID", type: "number", required: true },
-      { key: "notes", label: "Notes" },
-    ],
-    columns: ["member_id", "check_in", "check_out", "notes"],
-  },
   "Workout Plans": {
     title: "Workout Plans", path: "/api/workout-plans", create: true, edit: true, remove: true, adminOnly: true,
     fields: [
@@ -61,9 +41,9 @@ const modules: Record<string, Module> = {
 
 // Five clear navigation items for each role, aligned with the GymTrack PRD.
 const navAdmin = ["Overview", "People", "Operations", "Workouts", "Administration"];
-const navUser = ["Overview", "My Membership", "My Attendance", "My Workouts", "Profile"];
+const navUser = ["Overview", "My Membership", "My Attendance", "My Workouts", "Groups"];
 const icons: Record<string, string> = {
-  Overview: "▦", People: "♙", Operations: "▤", Workouts: "⌁",
+  Overview: "▦", People: "♙", Operations: "▤", Workouts: "⌁", Groups: "◎",
   "My Membership": "▤", "My Attendance": "◷", "My Workouts": "⌁",
   Administration: "⚙", Profile: "◉",
 };
@@ -137,6 +117,7 @@ type MemberDashboardData = {
   member: GymRow;
   memberships: GymRow[];
   attendance: GymRow[];
+  attendance_requests: GymRow[];
   workouts: { assignment: GymRow; plan: GymRow; trainer: GymRow | null }[];
 };
 
@@ -148,8 +129,11 @@ function MemberPortalPage({ section, user }: { section: "Overview" | "My Members
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await api<MemberDashboardData>("/api/member/dashboard");
-      setData(result);
+      const [result, attendanceRequests] = await Promise.all([
+        api<MemberDashboardData>("/api/member/dashboard"),
+        api<GymRow[]>("/api/attendance/requests"),
+      ]);
+      setData({ ...result, attendance_requests: attendanceRequests });
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load your gym information");
@@ -212,12 +196,15 @@ function MemberPortalPage({ section, user }: { section: "Overview" | "My Members
           </tbody></table></div> : <div className="gt-empty-state"><strong>No membership assigned</strong><p>The gym administrator needs to create a membership linked to your member profile. Once saved, it will appear here automatically.</p></div>}
         </section>}
 
-        {section === "My Attendance" && <section className="gt-panel">
-          <div className="gt-panel-head"><div><p className="gt-eyebrow">YOUR VISITS</p><h3>Attendance history</h3></div><span className="gt-role-tag">{data.attendance.length} visits</span></div>
-          {data.attendance.length ? <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Check-in</th><th>Check-out</th><th>Notes</th></tr></thead><tbody>
-            {data.attendance.map(row => <tr key={row.id}><td>{new Date(row.check_in).toLocaleString()}</td><td>{row.check_out ? new Date(row.check_out).toLocaleString() : "Still checked in"}</td><td>{row.notes || "—"}</td></tr>)}
-          </tbody></table></div> : <div className="gt-empty-state"><strong>No attendance records yet</strong><p>Your gym visits are recorded by the administrator. Check-in history will appear here after your first visit is recorded.</p></div>}
-        </section>}
+        {section === "My Attendance" && <>
+          <section className="gt-panel">
+            <div className="gt-panel-head"><div><p className="gt-eyebrow">YOUR VISITS</p><h3>Attendance history</h3></div><span className="gt-role-tag">{data.attendance.length} visits</span></div>
+            {data.attendance.length ? <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Date</th><th>Check-in</th><th>Check-out</th><th>Notes</th></tr></thead><tbody>
+              {data.attendance.map(row => <tr key={row.id}><td>{new Date(row.check_in).toLocaleDateString()}</td><td>{new Date(row.check_in).toLocaleTimeString()}</td><td>{row.check_out ? new Date(row.check_out).toLocaleTimeString() : "Still checked in"}</td><td>{row.notes || "—"}</td></tr>)}
+            </tbody></table></div> : <div className="gt-empty-state"><strong>No attendance records yet</strong><p>Submit a request below if the gym visit is missing. The administrator will review it before it becomes an official attendance record.</p></div>}
+          </section>
+          <MemberAttendanceRequests requests={data.attendance_requests || []} onRefresh={load}/>
+        </>}
 
         {section === "My Workouts" && <section className="gt-panel">
           <div className="gt-panel-head"><div><p className="gt-eyebrow">YOUR TRAINING</p><h3>Assigned workout plans</h3></div><span className="gt-role-tag">{data.workouts.length} plans</span></div>
@@ -277,8 +264,297 @@ function TabbedModule({ tabs, user }: { tabs: string[]; user: GymUser }) {
 function PeoplePage({ user }: { user: GymUser }) {
   return <TabbedModule tabs={["Members", "Trainers"]} user={user} />;
 }
-function OperationsPage({ user }: { user: GymUser }) {
-  return <TabbedModule tabs={["Memberships", "Attendance"]} user={user} />;
+function OperationsPage() {
+  const tabs = ["Memberships", "Attendance", "Attendance Requests"] as const;
+  const [active, setActive] = useState<(typeof tabs)[number]>("Memberships");
+  return <div className="gt-page-stack">
+    <div className="gt-tabbar">{tabs.map(tab => <button key={tab} className={active === tab ? "active" : ""} onClick={() => setActive(tab)}>{tab}</button>)}</div>
+    {active === "Memberships" && <MembershipsPage/>}
+    {active === "Attendance" && <AttendancePage/>}
+    {active === "Attendance Requests" && <AttendanceRequestsPage/>}
+  </div>;
+}
+
+function localDateValue(date = new Date()) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+function dateTimeToIso(date: string, time: string) {
+  return new Date(date + "T" + time).toISOString();
+}
+function formatClock(value: string | null | undefined) {
+  return value ? new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+}
+function endDateForPlan(startDate: string, planType: string) {
+  const months: Record<string, number> = { Monthly: 1, Quarterly: 3, "Half-yearly": 6, Annual: 12 };
+  const count = months[planType];
+  if (!count || !startDate) return startDate;
+  const [year, month, day] = startDate.split("-").map(Number);
+  const targetMonth = month - 1 + count;
+  const lastDay = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate();
+  const end = new Date(Date.UTC(year, targetMonth, Math.min(day, lastDay)));
+  end.setUTCDate(end.getUTCDate() - 1);
+  return end.toISOString().slice(0, 10);
+}
+
+function MembershipsPage() {
+  const [rows, setRows] = useState<GymRow[]>([]);
+  const [members, setMembers] = useState<GymRow[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<GymRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [planType, setPlanType] = useState("Monthly");
+  const [form, setForm] = useState({
+    member_id: 0, plan_name: "Monthly", start_date: localDateValue(),
+    end_date: endDateForPlan(localDateValue(), "Monthly"), price: "", status: "active",
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [membershipRows, memberRows] = await Promise.all([
+        api<GymRow[]>("/api/memberships"),
+        api<GymRow[]>("/api/members"),
+      ]);
+      setRows(membershipRows);
+      setMembers(memberRows);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load memberships");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  function startNew() {
+    const today = localDateValue();
+    setEditing(null); setPlanType("Monthly");
+    setForm({ member_id: members[0]?.id || 0, plan_name: "Monthly", start_date: today, end_date: endDateForPlan(today, "Monthly"), price: "", status: "active" });
+    setShowForm(true); setError(""); setMessage("");
+  }
+  function choosePlan(next: string) {
+    setPlanType(next);
+    setForm(old => ({ ...old, plan_name: next === "Custom" ? "" : next, end_date: next === "Custom" ? old.end_date : endDateForPlan(old.start_date, next) }));
+  }
+  function changeStartDate(next: string) {
+    setForm(old => ({ ...old, start_date: next, end_date: planType === "Custom" ? old.end_date : endDateForPlan(next, planType) }));
+  }
+  function edit(row: GymRow) {
+    const known = ["Monthly", "Quarterly", "Half-yearly", "Annual"];
+    const nextType = known.includes(row.plan_name) ? row.plan_name : "Custom";
+    setEditing(row); setPlanType(nextType);
+    setForm({ member_id: row.member_id, plan_name: row.plan_name, start_date: String(row.start_date).slice(0, 10), end_date: String(row.end_date).slice(0, 10), price: String(row.price), status: row.status });
+    setShowForm(true); setError(""); setMessage("");
+  }
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    if (!form.member_id) { setError("Choose a member first."); return; }
+    if (!form.plan_name.trim()) { setError("Enter a membership plan name."); return; }
+    if (!form.price || Number(form.price) < 0) { setError("Enter a valid membership price."); return; }
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const payload = { ...form, plan_name: form.plan_name.trim(), price: Number(form.price) };
+      await api(editing ? "/api/memberships/" + editing.id : "/api/memberships", editing ? "PATCH" : "POST", payload);
+      setMessage(editing ? "Membership updated." : "Membership created.");
+      setShowForm(false); setEditing(null); await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save membership"); }
+    finally { setSaving(false); }
+  }
+  async function remove(row: GymRow) {
+    if (!window.confirm("Delete this membership record?")) return;
+    try { await api("/api/memberships/" + row.id, "DELETE"); setMessage("Membership removed."); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not delete membership"); }
+  }
+
+  return <div className="gt-page-stack">
+    <section className="gt-section-title"><div><p className="gt-eyebrow">MEMBERSHIP MANAGEMENT</p><h2>Memberships</h2><p className="gt-muted">A membership is the plan a member pays for, with a start date, end date, price and status.</p></div><button className="gt-primary" onClick={startNew}>+ Add membership</button></section>
+    {error && <div className="gt-alert error">{error}</div>}{message && <div className="gt-alert success">{message}</div>}
+    {showForm && <section className="gt-panel"><div className="gt-panel-head"><div><p className="gt-eyebrow">{editing ? "UPDATE PLAN" : "NEW PLAN"}</p><h3>{editing ? "Edit membership" : "Create membership"}</h3></div><button className="gt-secondary" type="button" onClick={() => setShowForm(false)}>Close</button></div>
+      <form className="gt-form-grid" onSubmit={save}>
+        <label className="gt-field">Member<select required value={form.member_id} onChange={e => setForm(old => ({ ...old, member_id: Number(e.target.value) }))}><option value={0} disabled>Select a member</option>{members.map(m => <option key={m.id} value={m.id}>{m.full_name} · {m.email}</option>)}</select></label>
+        <label className="gt-field">Membership duration<select value={planType} onChange={e => choosePlan(e.target.value)}>{["Monthly", "Quarterly", "Half-yearly", "Annual", "Custom"].map(x => <option key={x}>{x}</option>)}</select></label>
+        <label className="gt-field">Plan name<input required value={form.plan_name} placeholder="e.g. Premium monthly" onChange={e => setForm(old => ({ ...old, plan_name: e.target.value }))}/></label>
+        <label className="gt-field">Price<input required type="number" min="0" step="0.01" value={form.price} placeholder="e.g. 1500" onChange={e => setForm(old => ({ ...old, price: e.target.value }))}/></label>
+        <label className="gt-field">Start date<input required type="date" value={form.start_date} onChange={e => changeStartDate(e.target.value)}/></label>
+        <label className="gt-field">End date<input required type="date" min={form.start_date} value={form.end_date} onChange={e => setForm(old => ({ ...old, end_date: e.target.value }))}/><small className="gt-help">Automatically suggested from the duration; you can adjust it.</small></label>
+        <label className="gt-field">Status<select value={form.status} onChange={e => setForm(old => ({ ...old, status: e.target.value }))}><option value="active">Active</option><option value="expired">Expired</option><option value="cancelled">Cancelled</option></select></label>
+        <div className="gt-form-actions"><button className="gt-primary" disabled={saving}>{saving ? "Saving…" : "Save membership"}</button><button className="gt-secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button></div>
+      </form>
+    </section>}
+    <section className="gt-panel"><div className="gt-panel-head"><div><p className="gt-eyebrow">MEMBER SUBSCRIPTIONS</p><h3>Membership records ({rows.length})</h3></div><button className="gt-secondary" onClick={() => void load()}>Refresh</button></div>
+      {loading ? <p className="gt-empty">Loading memberships…</p> : !rows.length ? <div className="gt-empty-state"><strong>No memberships yet</strong><p>Create a membership for a member to set their plan, validity dates and fee.</p></div> :
+        <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Member</th><th>Plan</th><th>Valid from</th><th>Valid until</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+          {rows.map(row => <tr key={row.id}><td>{row.member_name || members.find(m => m.id === row.member_id)?.full_name || ("Member #" + row.member_id)}</td><td>{row.plan_name}</td><td>{row.start_date}</td><td>{row.end_date}</td><td>{Number(row.price).toLocaleString()}</td><td><span className={row.status === "active" ? "gt-status active" : "gt-status"}>{row.status}</span></td><td><div className="gt-actions"><button onClick={() => edit(row)}>Edit</button><button className="danger" onClick={() => void remove(row)}>Delete</button></div></td></tr>)}
+        </tbody></table></div>}
+    </section>
+  </div>;
+}
+
+function AttendancePage() {
+  const [rows, setRows] = useState<GymRow[]>([]);
+  const [members, setMembers] = useState<GymRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({ member_id: 0, date: localDateValue(), check_in: "09:00", check_out: "", notes: "" });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [visits, memberRows] = await Promise.all([api<GymRow[]>("/api/attendance"), api<GymRow[]>("/api/members")]);
+      setRows(visits); setMembers(memberRows); setError("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not load attendance"); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  async function record(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    if (!form.member_id) { setError("Choose a member."); return; }
+    const checkIn = new Date(form.date + "T" + form.check_in);
+    const checkOut = form.check_out ? new Date(form.date + "T" + form.check_out) : null;
+    if (Number.isNaN(checkIn.getTime()) || (checkOut && checkOut <= checkIn)) {
+      setError("Check-out must be later than check-in."); return;
+    }
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await api("/api/attendance", "POST", {
+        member_id: form.member_id,
+        check_in: checkIn.toISOString(),
+        check_out: checkOut ? checkOut.toISOString() : null,
+        notes: form.notes,
+      });
+      setMessage("Attendance recorded.");
+      setForm(old => ({ ...old, check_out: "", notes: "" }));
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not record attendance"); }
+    finally { setSaving(false); }
+  }
+  async function checkOutNow(row: GymRow) {
+    try { await api("/api/attendance/" + row.id + "/checkout", "PATCH"); setMessage("Member checked out."); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not check out"); }
+  }
+  async function deleteVisit(row: GymRow) {
+    if (!window.confirm("Remove this attendance entry?")) return;
+    try { await api("/api/attendance/" + row.id, "DELETE"); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not remove attendance"); }
+  }
+
+  return <div className="gt-page-stack">
+    <section className="gt-section-title"><div><p className="gt-eyebrow">DAILY GYM CHECK-IN</p><h2>Attendance</h2><p className="gt-muted">Choose the member, visit date, check-in time and optional check-out time.</p></div></section>
+    {error && <div className="gt-alert error">{error}</div>}{message && <div className="gt-alert success">{message}</div>}
+    <section className="gt-panel"><div className="gt-panel-head"><div><p className="gt-eyebrow">RECORD A VISIT</p><h3>New attendance entry</h3></div></div>
+      <form className="gt-form-grid" onSubmit={record}>
+        <label className="gt-field">Member<select required value={form.member_id} onChange={e => setForm(old => ({ ...old, member_id: Number(e.target.value) }))}><option value={0} disabled>Select a member</option>{members.filter(m => m.is_active).map(m => <option key={m.id} value={m.id}>{m.full_name} · {m.email}</option>)}</select></label>
+        <label className="gt-field">Visit date<input type="date" required value={form.date} onChange={e => setForm(old => ({ ...old, date: e.target.value }))}/></label>
+        <label className="gt-field">Check-in time<input type="time" required value={form.check_in} onChange={e => setForm(old => ({ ...old, check_in: e.target.value }))}/></label>
+        <label className="gt-field">Check-out time <span className="gt-muted">(optional)</span><input type="time" value={form.check_out} onChange={e => setForm(old => ({ ...old, check_out: e.target.value }))}/></label>
+        <label className="gt-field gt-span-two">Notes<textarea rows={2} maxLength={500} value={form.notes} onChange={e => setForm(old => ({ ...old, notes: e.target.value }))} placeholder="Optional visit note"/></label>
+        <div className="gt-form-actions"><button className="gt-primary" disabled={saving}>{saving ? "Saving…" : "Record attendance"}</button></div>
+      </form>
+    </section>
+    <section className="gt-panel"><div className="gt-panel-head"><div><p className="gt-eyebrow">VISIT LOG</p><h3>Attendance history ({rows.length})</h3></div><button className="gt-secondary" onClick={() => void load()}>Refresh</button></div>
+      {loading ? <p className="gt-empty">Loading attendance…</p> : !rows.length ? <div className="gt-empty-state"><strong>No attendance records yet</strong><p>Recorded visits appear here with date and both times.</p></div> :
+      <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Member</th><th>Date</th><th>Check-in</th><th>Check-out</th><th>Notes</th><th>Actions</th></tr></thead><tbody>
+        {rows.map(row => <tr key={row.id}><td>{row.member_name}</td><td>{new Date(row.check_in).toLocaleDateString()}</td><td>{formatClock(row.check_in)}</td><td>{row.check_out ? formatClock(row.check_out) : <span className="gt-status">Still checked in</span>}</td><td>{row.notes || "—"}</td><td><div className="gt-actions">{!row.check_out && <button onClick={() => void checkOutNow(row)}>Check out now</button>}</div></td></tr>)}
+      </tbody></table></div>}
+    </section>
+  </div>;
+}
+
+function AttendanceRequestsPage() {
+  const [rows, setRows] = useState<GymRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await api<GymRow[]>("/api/attendance/requests")); setError(""); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not load attendance requests"); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  async function review(row: GymRow, status: "approved" | "rejected") {
+    const reviewNote = status === "rejected" ? (window.prompt("Reason for rejecting this request (optional):") ?? null) : "";
+    if (reviewNote === null) return;
+    try {
+      await api("/api/attendance/requests/" + row.id, "PATCH", { status, review_note: reviewNote });
+      setMessage(status === "approved" ? "Request approved and added to attendance." : "Request rejected.");
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not review request"); }
+  }
+  async function remove(row: GymRow) {
+    if (!window.confirm("Permanently remove this attendance request?")) return;
+    try { await api("/api/attendance/requests/" + row.id, "DELETE"); setMessage("Request removed."); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not remove request"); }
+  }
+  return <div className="gt-page-stack">
+    <section className="gt-section-title"><div><p className="gt-eyebrow">MEMBER SUBMISSIONS</p><h2>Attendance Requests</h2><p className="gt-muted">Approve a valid member request to add it to the official attendance log, or reject/remove it.</p></div><button className="gt-secondary" onClick={() => void load()}>Refresh</button></section>
+    {error && <div className="gt-alert error">{error}</div>}{message && <div className="gt-alert success">{message}</div>}
+    <section className="gt-panel"><div className="gt-panel-head"><h3>Submitted requests ({rows.filter(row => row.status === "pending").length} pending)</h3></div>
+      {loading ? <p className="gt-empty">Loading requests…</p> : !rows.length ? <div className="gt-empty-state"><strong>No attendance requests</strong><p>Member requests will appear here after they submit one.</p></div> :
+      <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Member</th><th>Requested date</th><th>Check-in</th><th>Check-out</th><th>Notes</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        {rows.map(row => <tr key={row.id}><td><strong>{row.member_name}</strong><small className="gt-table-subline">{row.member_email}</small></td><td>{new Date(row.requested_check_in).toLocaleDateString()}</td><td>{formatClock(row.requested_check_in)}</td><td>{row.requested_check_out ? formatClock(row.requested_check_out) : "Not supplied"}</td><td>{row.notes || "—"}</td><td><span className={row.status === "approved" ? "gt-status active" : "gt-status"}>{row.status}</span></td><td><div className="gt-actions">{row.status === "pending" && <><button onClick={() => void review(row, "approved")}>Approve</button><button className="danger" onClick={() => void review(row, "rejected")}>Reject</button></>}<button className="danger" onClick={() => void remove(row)}>Remove</button></div></td></tr>)}
+      </tbody></table></div>}
+    </section>
+  </div>;
+}
+
+function MemberAttendanceRequests({ requests, onRefresh }: { requests: GymRow[]; onRefresh: () => Promise<void> }) {
+  const [date, setDate] = useState(localDateValue());
+  const [checkIn, setCheckIn] = useState("09:00");
+  const [checkOut, setCheckOut] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    const start = new Date(date + "T" + checkIn);
+    const end = checkOut ? new Date(date + "T" + checkOut) : null;
+    if (Number.isNaN(start.getTime()) || (end && end <= start)) { setError("Check-out must be later than check-in."); return; }
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await api("/api/attendance/requests", "POST", {
+        requested_check_in: start.toISOString(),
+        requested_check_out: end ? end.toISOString() : null,
+        notes,
+      });
+      setMessage("Attendance request sent to the administrator.");
+      setNotes(""); setCheckOut("");
+      await onRefresh();
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not submit request"); }
+    finally { setSaving(false); }
+  }
+  async function cancel(row: GymRow) {
+    if (!window.confirm("Cancel this pending request?")) return;
+    try { await api("/api/attendance/requests/" + row.id, "DELETE"); await onRefresh(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not cancel request"); }
+  }
+  return <section className="gt-panel">
+    <div className="gt-panel-head"><div><p className="gt-eyebrow">MEMBER FLEXIBILITY</p><h3>Request an attendance entry</h3><p className="gt-muted">Use this if a visit was missed in the attendance log. The admin must approve it.</p></div></div>
+    {error && <div className="gt-alert error">{error}</div>}{message && <div className="gt-alert success">{message}</div>}
+    <form className="gt-form-grid" onSubmit={submit}>
+      <label className="gt-field">Visit date<input type="date" required value={date} onChange={e => setDate(e.target.value)}/></label>
+      <label className="gt-field">Check-in time<input type="time" required value={checkIn} onChange={e => setCheckIn(e.target.value)}/></label>
+      <label className="gt-field">Check-out time <span className="gt-muted">(optional)</span><input type="time" value={checkOut} onChange={e => setCheckOut(e.target.value)}/></label>
+      <label className="gt-field">Reason / note<input maxLength={500} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. I forgot to check in"/></label>
+      <div className="gt-form-actions"><button className="gt-primary" disabled={saving}>{saving ? "Sending…" : "Send request"}</button></div>
+    </form>
+    <h4 className="gt-subheading">My requests</h4>
+    {!requests.length ? <p className="gt-empty">You have not submitted an attendance request.</p> : requests.map(row => <div className="gt-request-row" key={row.id}>
+      <div><strong>{new Date(row.requested_check_in).toLocaleDateString()}</strong><small>{formatClock(row.requested_check_in)} to {row.requested_check_out ? formatClock(row.requested_check_out) : "checkout not supplied"} · {row.review_note || row.notes || "No note"}</small></div>
+      <div className="gt-actions"><span className={row.status === "approved" ? "gt-status active" : "gt-status"}>{row.status}</span>{row.status === "pending" && <button className="danger" onClick={() => void cancel(row)}>Cancel</button>}</div>
+    </div>)}
+  </section>;
 }
 
 function DataModule({ name, user }: { name: string; user: GymUser }) {
@@ -380,7 +656,7 @@ function GroupsPage(){
 }
 
 function Administration(){
-  const [tab,setTab]=useState<"Users"|"Activity"|"Security">("Users");
+  const [tab,setTab]=useState<"Users"|"Groups"|"Activity"|"Security">("Users");
   const [users,setUsers]=useState<GymRow[]>([]),[logs,setLogs]=useState<GymRow[]>([]);
   const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[]}>({failed_logins_24h:0,events:[]});
   const [query,setQuery]=useState(""),[error,setError]=useState("");
@@ -390,9 +666,10 @@ function Administration(){
   async function ban(row:GymRow){if(row.is_banned){try{await api("/api/admin/users/"+row.id+"/unban","POST");await load();}catch(e){setError(e instanceof Error?e.message:"Could not unban user");}return;}const reason=window.prompt("Ban reason:");if(reason===null)return;try{await api("/api/admin/users/"+row.id+"/ban","POST",{reason});await load();}catch(e){setError(e instanceof Error?e.message:"Could not ban user");}}
   async function revoke(row:GymRow){if(!window.confirm("Revoke all sessions for "+row.email+"?"))return;try{await api("/api/admin/users/"+row.id+"/revoke-sessions","POST");}catch(e){setError(e instanceof Error?e.message:"Could not revoke sessions");}}
   return <div className="gt-page-stack"><section className="gt-section-title"><div><p className="gt-eyebrow">SYSTEM CONTROL</p><h2>Administration</h2><p className="gt-muted">Manage accounts, review activity and monitor security.</p></div></section>
-    <div className="gt-tabbar">{(["Users","Activity","Security"] as const).map(item=><button className={tab===item?"active":""} key={item} onClick={()=>setTab(item)}>{item}</button>)}</div>
+    <div className="gt-tabbar">{(["Users","Groups","Activity","Security"] as const).map(item=><button className={tab===item?"active":""} key={item} onClick={()=>setTab(item)}>{item}</button>)}</div>
     {error&&<div className="gt-alert error">{error}</div>}
-    <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&<input placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/>}<button className="gt-secondary" onClick={()=>void load()}>Refresh</button></div></div>
+    <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/ >}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
+      {tab==="Groups"&&<GroupsPage/>}
       {tab==="Users"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td>{row.role}</td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button disabled={row.is_banned} onClick={()=>void changeRole(row)}>{row.role==="admin"?"Demote":"Promote"}</button><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
       {tab==="Security"&&<><div className="gt-security-count"><strong>{security.failed_logins_24h}</strong><span>failed or blocked login events in the last 24 hours</span></div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>Email</th><th>Event</th><th>IP</th><th>Browser</th></tr></thead><tbody>{security.events.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.ip_address||"—"}</td><td>{row.user_agent||"—"}</td></tr>)}</tbody></table></div></>}</section>
@@ -446,8 +723,9 @@ export default function App(){
       <header className="page-header"><div><p className="eyebrow">YOUR GYM, ORGANIZED</p><h1>{page==="Workouts"?"Workout Plans":page}</h1><p className="subheading">{user.role==="admin"?"Administrator workspace":"Your personal gym workspace"}</p></div><span className={apiStatus==="Connected"?"api-status connected":"api-status"}><span className="status-dot"/> API: {apiStatus}</span></header>
       {page==="Overview"&&<Overview user={user}/>}
       {user.role==="admin"&&page==="People"&&<PeoplePage user={user}/>}
-      {user.role==="admin"&&page==="Operations"&&<OperationsPage user={user}/>}
+      {user.role==="admin"&&page==="Operations"&&<OperationsPage/>}
       {user.role==="admin"&&page==="Workouts"&&<DataModule name="Workout Plans" user={user}/>}
+      {user.role==="user"&&page==="Groups"&&<GroupsPage/>}
       {page==="My Membership"&&user.role==="user"&&<MemberPortalPage section="My Membership" user={user}/>}
       {page==="My Attendance"&&user.role==="user"&&<MemberPortalPage section="My Attendance" user={user}/>}
       {page==="My Workouts"&&user.role==="user"&&<MemberPortalPage section="My Workouts" user={user}/>}
@@ -457,3 +735,11 @@ export default function App(){
     </main>
   </div>;
 }
+
+.gt-span-two{grid-column:1/-1}
+.gt-help{display:block;color:#8d98a7;font-size:9px;margin-top:4px;font-weight:400}
+.gt-table-subline{display:block;color:#8e98a8;font-size:9px;margin-top:3px}
+.gt-request-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #edf0f4;padding:12px 0}
+.gt-request-row strong{display:block;font-size:11px;color:#3b4960}
+.gt-request-row small{display:block;margin-top:4px;color:#8a95a6;font-size:9px}
+@media(max-width:760px){.gt-span-two{grid-column:1}.gt-request-row{align-items:flex-start;flex-direction:column}}
