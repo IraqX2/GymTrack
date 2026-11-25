@@ -178,3 +178,16 @@ button.nav-link:hover{background:#26364e;color:#fff}
 @media(max-width:1050px){.gt-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.gt-two-col{grid-template-columns:1fr}}
 @media(max-width:760px){.gt-auth-screen{grid-template-columns:1fr;padding:20px}.gt-auth-brand{display:none}.gt-auth-card{max-width:470px}.gt-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.gt-welcome{align-items:flex-start;flex-direction:column}.gt-form-grid{grid-template-columns:1fr}.gt-section-title{align-items:flex-start;flex-direction:column}.gt-panel-tools{width:100%}.gt-panel-tools input{width:100%}.gt-member-row{align-items:flex-start;flex-direction:column}.gt-inline-form{flex-wrap:wrap}.gt-inline-form input,.gt-inline-form select{min-width:100%}}
 @media(max-width:520px){.gt-stat-grid{gap:8px}.gt-stat{padding:13px}.gt-stat strong{font-size:23px}.gt-panel{padding:15px}.gt-panel-head{align-items:flex-start;flex-direction:column}.gt-auth-card{padding:22px}.gt-session-row{align-items:flex-start;flex-direction:column}}
+
+
+/* PRD-focused member portal and compact account navigation. */
+.gt-account-link{display:grid;gap:3px;min-width:0;flex:1;text-align:left;border:0;background:transparent;color:inherit;padding:0;cursor:pointer}
+.gt-account-link strong{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gt-account-link small{font-size:9px;color:#9aa5b6}
+.gt-member-workouts{display:grid;gap:12px}
+.gt-workout-card{border:1px solid #e8edf3;border-radius:11px;padding:17px;background:#fff}
+.gt-workout-card .gt-panel-head{margin-bottom:8px}
+.gt-workout-card h3{margin:0}
+.gt-workout-meta{display:flex;flex-wrap:wrap;gap:16px;border-top:1px solid #edf0f4;padding-top:11px;margin-top:12px;color:#7e899a;font-size:10px}
+.gt-empty-state{max-width:620px;margin:0 auto}
+.gt-empty-state p{line-height:1.7}
