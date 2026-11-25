@@ -543,6 +543,44 @@ def revoke_session(session_id: str, user: CURRENT, db: DB, request: Request, res
     return Response(status_code=204)
 
 
+@app.get("/api/member/dashboard")
+def member_dashboard(user: CURRENT, db: DB):
+    # A regular login represents one member profile. Members only receive
+    # their own records; administrators use the management modules instead.
+    if user.role != "user":
+        raise HTTPException(403, "Member dashboard is only available to member accounts")
+    member = get_my_member(db, user)
+    my_memberships = db.exec(
+        select(Membership).where(Membership.member_id == member.id)
+        .order_by(Membership.created_at.desc())
+    ).all()
+    my_attendance = db.exec(
+        select(Attendance).where(Attendance.member_id == member.id)
+        .order_by(Attendance.check_in.desc()).limit(100)
+    ).all()
+    assignment_rows = db.exec(
+        select(WorkoutAssignment, WorkoutPlan, Trainer)
+        .join(WorkoutPlan, WorkoutPlan.id == WorkoutAssignment.plan_id)
+        .outerjoin(Trainer, Trainer.id == WorkoutAssignment.trainer_id)
+        .where(WorkoutAssignment.member_id == member.id)
+        .order_by(WorkoutAssignment.created_at.desc())
+    ).all()
+    workouts = [
+        {
+            "assignment": assignment,
+            "plan": plan,
+            "trainer": trainer,
+        }
+        for assignment, plan, trainer in assignment_rows
+    ]
+    return {
+        "member": member,
+        "memberships": my_memberships,
+        "attendance": my_attendance,
+        "workouts": workouts,
+    }
+
+
 # Members
 @app.get("/api/members")
 def members(user: CURRENT, db: DB, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
@@ -730,6 +768,17 @@ def create_workout_assignment(data: AssignmentBody, user: ADMIN, db: DB, request
     if not db.get(WorkoutPlan, data.plan_id) or not db.get(Member, data.member_id):
         raise HTTPException(404, "Plan or member not found")
     if data.trainer_id and not db.get(Trainer, data.trainer_id): raise HTTPException(404, "Trainer not found")
+    duplicate_query = select(WorkoutAssignment).where(
+        WorkoutAssignment.member_id == data.member_id,
+        WorkoutAssignment.plan_id == data.plan_id,
+        WorkoutAssignment.status == data.status,
+    )
+    if data.trainer_id is None:
+        duplicate_query = duplicate_query.where(WorkoutAssignment.trainer_id.is_(None))
+    else:
+        duplicate_query = duplicate_query.where(WorkoutAssignment.trainer_id == data.trainer_id)
+    if db.exec(duplicate_query).first():
+        raise HTTPException(409, "This workout plan is already assigned to this member and trainer.")
     row = WorkoutAssignment(**data.model_dump(), assigned_by=user.id)
     db.add(row); db.commit(); db.refresh(row)
     audit(db, request, "workout_assigned", user, "workout_assignment", row.id)
