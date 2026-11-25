@@ -59,9 +59,14 @@ const modules: Record<string, Module> = {
   },
 };
 
-const navAdmin = ["Overview", "Members", "Trainers", "Memberships", "Attendance", "Workout Plans", "Groups", "Administration", "Profile"];
-const navUser = ["Overview", "Memberships", "Attendance", "Workout Plans", "Groups", "Profile"];
-const icons: Record<string, string> = { Overview: "▦", Members: "♙", Trainers: "♧", Memberships: "▤", Attendance: "◷", "Workout Plans": "⌁", Groups: "◎", Administration: "⚙", Profile: "◉" };
+// Five clear navigation items for each role, aligned with the GymTrack PRD.
+const navAdmin = ["Overview", "People", "Operations", "Workouts", "Administration"];
+const navUser = ["Overview", "My Membership", "My Attendance", "My Workouts", "Profile"];
+const icons: Record<string, string> = {
+  Overview: "▦", People: "♙", Operations: "▤", Workouts: "⌁",
+  "My Membership": "▤", "My Attendance": "◷", "My Workouts": "⌁",
+  Administration: "⚙", Profile: "◉",
+};
 
 function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase();
@@ -128,31 +133,152 @@ function LoginScreen({ onLogin }: { onLogin: (user: GymUser) => void }) {
   </div>;
 }
 
+type MemberDashboardData = {
+  member: GymRow;
+  memberships: GymRow[];
+  attendance: GymRow[];
+  workouts: { assignment: GymRow; plan: GymRow; trainer: GymRow | null }[];
+};
+
+function MemberPortalPage({ section, user }: { section: "Overview" | "My Membership" | "My Attendance" | "My Workouts"; user: GymUser }) {
+  const [data, setData] = useState<MemberDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await api<MemberDashboardData>("/api/member/dashboard");
+      setData(result);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load your gym information");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const title = section === "Overview" ? "Member overview" : section;
+  if (loading) return <div className="gt-panel"><p className="gt-empty">Loading your gym information…</p></div>;
+
+  return <div className="gt-page-stack">
+    <section className="gt-section-title">
+      <div>
+        <p className="gt-eyebrow">MEMBER PORTAL</p>
+        <h2>{title}</h2>
+        <p className="gt-muted">Your own membership, attendance history and assigned training plans.</p>
+      </div>
+      <button className="gt-secondary" onClick={() => void load()}>Refresh</button>
+    </section>
+    {error && <div className="gt-alert error">{error}</div>}
+    {!data ? <section className="gt-panel"><div className="gt-empty-state"><strong>Could not load your member profile</strong><p>Please refresh or contact the gym administrator.</p></div></section> :
+      <>
+        {section === "Overview" && <>
+          <section className="gt-welcome">
+            <div>
+              <p className="gt-eyebrow">WELCOME TO GYMTRACK</p>
+              <h2>Hello, {user.full_name.split(" ")[0]}</h2>
+              <p>Your personal gym information is collected here.</p>
+            </div>
+            <span className="gt-role-tag">MEMBER</span>
+          </section>
+          <section className="gt-stat-grid">
+            <article className="gt-stat"><span>Membership records</span><strong>{data.memberships.length}</strong></article>
+            <article className="gt-stat"><span>Attendance visits</span><strong>{data.attendance.length}</strong></article>
+            <article className="gt-stat"><span>Assigned workouts</span><strong>{data.workouts.length}</strong></article>
+          </section>
+          <div className="gt-two-col">
+            <section className="gt-panel">
+              <p className="gt-eyebrow">MEMBERSHIP</p><h3>My current plan</h3>
+              {data.memberships.length ? data.memberships.slice(0, 2).map(row =>
+                <div className="gt-simple-row" key={row.id}><strong>{row.plan_name}</strong><span>{row.status} · until {row.end_date}</span></div>
+              ) : <p className="gt-empty">No membership has been assigned yet. Please contact the gym administrator.</p>}
+            </section>
+            <section className="gt-panel">
+              <p className="gt-eyebrow">TRAINING</p><h3>My assigned workouts</h3>
+              {data.workouts.length ? data.workouts.slice(0, 2).map(row =>
+                <div className="gt-simple-row" key={row.assignment.id}><strong>{row.plan.title}</strong><span>{row.assignment.status} · {row.trainer?.full_name || "No trainer assigned"}</span></div>
+              ) : <p className="gt-empty">No workout plan has been assigned yet. Please contact your trainer or administrator.</p>}
+            </section>
+          </div>
+        </>}
+
+        {section === "My Membership" && <section className="gt-panel">
+          <div className="gt-panel-head"><div><p className="gt-eyebrow">YOUR MEMBERSHIP</p><h3>Membership history</h3></div><span className="gt-role-tag">{data.memberships.length} records</span></div>
+          {data.memberships.length ? <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Plan</th><th>Start date</th><th>End date</th><th>Status</th><th>Price</th></tr></thead><tbody>
+            {data.memberships.map(row => <tr key={row.id}><td>{row.plan_name}</td><td>{row.start_date}</td><td>{row.end_date}</td><td><span className={row.status === "active" ? "gt-status active" : "gt-status"}>{row.status}</span></td><td>{row.price}</td></tr>)}
+          </tbody></table></div> : <div className="gt-empty-state"><strong>No membership assigned</strong><p>The gym administrator needs to create a membership linked to your member profile. Once saved, it will appear here automatically.</p></div>}
+        </section>}
+
+        {section === "My Attendance" && <section className="gt-panel">
+          <div className="gt-panel-head"><div><p className="gt-eyebrow">YOUR VISITS</p><h3>Attendance history</h3></div><span className="gt-role-tag">{data.attendance.length} visits</span></div>
+          {data.attendance.length ? <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Check-in</th><th>Check-out</th><th>Notes</th></tr></thead><tbody>
+            {data.attendance.map(row => <tr key={row.id}><td>{new Date(row.check_in).toLocaleString()}</td><td>{row.check_out ? new Date(row.check_out).toLocaleString() : "Still checked in"}</td><td>{row.notes || "—"}</td></tr>)}
+          </tbody></table></div> : <div className="gt-empty-state"><strong>No attendance records yet</strong><p>Your gym visits are recorded by the administrator. Check-in history will appear here after your first visit is recorded.</p></div>}
+        </section>}
+
+        {section === "My Workouts" && <section className="gt-panel">
+          <div className="gt-panel-head"><div><p className="gt-eyebrow">YOUR TRAINING</p><h3>Assigned workout plans</h3></div><span className="gt-role-tag">{data.workouts.length} plans</span></div>
+          {data.workouts.length ? <div className="gt-member-workouts">{data.workouts.map(row =>
+            <article className="gt-workout-card" key={row.assignment.id}>
+              <div className="gt-panel-head"><div><h3>{row.plan.title}</h3><p className="gt-muted">{row.plan.level} · {row.plan.duration_weeks} weeks</p></div><span className={row.assignment.status === "active" ? "gt-status active" : "gt-status"}>{row.assignment.status}</span></div>
+              <p className="gt-muted">{row.plan.description || "No additional instructions provided."}</p>
+              <div className="gt-workout-meta"><span>Started: {row.assignment.start_date}</span><span>Trainer: {row.trainer?.full_name || "Not assigned"}</span></div>
+            </article>
+          )}</div> : <div className="gt-empty-state"><strong>No workout plan assigned</strong><p>Your trainer or gym administrator can assign a workout plan to your member profile.</p></div>}
+        </section>}
+      </>
+    }
+  </div>;
+}
+
 function Overview({ user }: { user: GymUser }) {
+  if (user.role !== "admin") return <MemberPortalPage section="Overview" user={user} />;
+  return <AdminOverview user={user} />;
+}
+
+function AdminOverview({ user }: { user: GymUser }) {
   const [stats, setStats] = useState<Record<string, number>>({});
-  const [memberships, setMemberships] = useState<GymRow[]>([]);
-  const [assignments, setAssignments] = useState<GymRow[]>([]);
   const [error, setError] = useState("");
   useEffect(() => {
     let live = true;
-    if (user.role === "admin") api<Record<string, number>>("/api/admin/stats").then(value=>live&&setStats(value)).catch(err=>live&&setError(err.message));
-    else Promise.all([api<GymRow[]>("/api/memberships"), api<GymRow[]>("/api/workout-assignments")])
-      .then(([m,a])=>{if(live){setMemberships(m);setAssignments(a);}}).catch(err=>live&&setError(err.message));
-    return ()=>{live=false;};
-  }, [user.role]);
-  const cards = user.role==="admin" ? [
-    ["Users",stats.users],["Admins",stats.admins],["Banned users",stats.banned_users],["New users (7 days)",stats.new_users_7d],
-    ["Members",stats.members],["Active members",stats.active_members],["Trainers",stats.trainers],["Memberships",stats.memberships],
-    ["Today's attendance",stats.attendance_today],["Workout plans",stats.workout_plans],["Groups",stats.groups],
-  ] : [["My memberships",memberships.length],["Assigned workouts",assignments.length]];
+    api<Record<string, number>>("/api/admin/stats")
+      .then(value => live && setStats(value))
+      .catch(err => live && setError(err.message));
+    return () => { live = false; };
+  }, []);
+  const cards = [
+    ["Users", stats.users], ["Admins", stats.admins], ["Banned users", stats.banned_users],
+    ["New users (7 days)", stats.new_users_7d], ["Members", stats.members],
+    ["Active members", stats.active_members], ["Trainers", stats.trainers],
+    ["Memberships", stats.memberships], ["Today's attendance", stats.attendance_today],
+    ["Workout plans", stats.workout_plans],
+  ];
   return <div className="gt-page-stack">
-    <section className="gt-welcome"><div><p className="gt-eyebrow">GYMTRACK OVERVIEW</p><h2>Good {new Date().getHours()<12?"morning":new Date().getHours()<18?"afternoon":"evening"}, {user.full_name.split(" ")[0]}</h2><p>{user.role==="admin"?"Manage gym operations and keep your team moving.":"Your memberships and training information in one place."}</p></div><span className="gt-role-tag">{user.role.toUpperCase()}</span></section>
-    {error&&<div className="gt-alert error">{error}</div>}
-    <section className="gt-stat-grid">{cards.map(([label,value])=><article className="gt-stat" key={label}><span>{label}</span><strong>{value??"—"}</strong></article>)}</section>
-    {user.role==="admin" ? <section className="gt-panel"><p className="gt-eyebrow">OPERATIONS</p><h3>Gym management workspace</h3><p className="gt-muted">Use the navigation to manage members, trainers, memberships, attendance, workout plans, teams and administrator activity.</p></section> :
-      <div className="gt-two-col"><section className="gt-panel"><p className="gt-eyebrow">MEMBERSHIP</p><h3>My memberships</h3>{memberships.length?memberships.map(row=><div className="gt-simple-row" key={row.id}><strong>{row.plan_name}</strong><span>{row.status} · ends {row.end_date}</span></div>):<p className="gt-empty">No membership linked to your account yet.</p>}</section>
-      <section className="gt-panel"><p className="gt-eyebrow">TRAINING</p><h3>My assigned workouts</h3>{assignments.length?assignments.map(row=><div className="gt-simple-row" key={row.id}><strong>Workout assignment #{row.id}</strong><span>{row.status}</span></div>):<p className="gt-empty">No workout assignment yet.</p>}</section></div>}
+    <section className="gt-welcome">
+      <div><p className="gt-eyebrow">GYMTRACK OVERVIEW</p><h2>Good {new Date().getHours()<12?"morning":new Date().getHours()<18?"afternoon":"evening"}, {user.full_name.split(" ")[0]}</h2><p>Manage your gym members, daily operations and training plans.</p></div>
+      <span className="gt-role-tag">ADMIN</span>
+    </section>
+    {error && <div className="gt-alert error">{error}</div>}
+    <section className="gt-stat-grid">{cards.map(([label,value]) => <article className="gt-stat" key={label}><span>{label}</span><strong>{value ?? "—"}</strong></article>)}</section>
+    <section className="gt-panel"><p className="gt-eyebrow">GYM OPERATIONS</p><h3>Management workspace</h3><p className="gt-muted">People contains member and trainer records. Operations contains memberships and attendance. Workouts contains plans and member assignments.</p></section>
   </div>;
+}
+
+function TabbedModule({ tabs, user }: { tabs: string[]; user: GymUser }) {
+  const [active, setActive] = useState(tabs[0]);
+  return <div className="gt-page-stack">
+    <div className="gt-tabbar">{tabs.map(tab => <button key={tab} className={active === tab ? "active" : ""} onClick={() => setActive(tab)}>{tab}</button>)}</div>
+    <DataModule name={active} user={user} />
+  </div>;
+}
+function PeoplePage({ user }: { user: GymUser }) {
+  return <TabbedModule tabs={["Members", "Trainers"]} user={user} />;
+}
+function OperationsPage({ user }: { user: GymUser }) {
+  return <TabbedModule tabs={["Memberships", "Attendance"]} user={user} />;
 }
 
 function DataModule({ name, user }: { name: string; user: GymUser }) {
@@ -277,7 +403,6 @@ function Profile({user,onUpdate,onLogout}:{user:GymUser;onUpdate:(user:GymUser)=
 
 export default function App(){
   const [user,setUser]=useState<GymUser|null>(null),[checking,setChecking]=useState(true),[page,setPage]=useState("Overview"),[apiStatus,setApiStatus]=useState("Checking...");
-  const [authError,setAuthError]=useState("");
   const clear=useCallback(()=>{clearAccessToken();setUser(null);setPage("Overview");},[]);
   useEffect(()=>{
     let live=true;
@@ -288,20 +413,29 @@ export default function App(){
   },[clear]);
   async function signOut(){try{await logout();}finally{clear();}}
   const navigation=user?.role==="admin"?navAdmin:navUser;
-  useEffect(()=>{if(user&&!navigation.includes(page))setPage("Overview");},[user,page,navigation.join("|")]);
+  useEffect(()=>{if(user&&!navigation.includes(page)&&page!=="Profile")setPage("Overview");},[user,page,navigation.join("|")]);
   if(checking)return <div className="gt-loading"><div className="gt-spinner"/><p>Restoring GymTrack session…</p></div>;
   if(!user)return <LoginScreen onLogin={setUser}/>;
-  const module=modules[page];
   return <div className="layout gt-app">
-    <aside className="sidebar"><div className="brand"><span className="brand-icon">GT</span><div><strong>GymTrack</strong><small>Management workspace</small></div></div><p className="nav-label">WORKSPACE</p>
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-icon">GT</span><div><strong>GymTrack</strong><small>Management workspace</small></div></div>
+      <p className="nav-label">WORKSPACE</p>
       {navigation.map(item=><button key={item} className={page===item?"nav-link active":"nav-link"} onClick={()=>setPage(item)}>{icons[item]} &nbsp; {item}</button>)}
-      <div className="sidebar-footer"><span className="avatar">{initials(user.full_name)}</span><div><strong>{user.full_name}</strong><small>{user.role}</small></div><button className="gt-side-logout" title="Log out" onClick={()=>void signOut()}>↪</button></div>
+      <div className="sidebar-footer">
+        <span className="avatar">{initials(user.full_name)}</span>
+        <button className="gt-account-link" onClick={()=>setPage("Profile")}><strong>{user.full_name}</strong><small>{user.role==="admin"?"Administrator":"Member"} · Profile</small></button>
+        <button className="gt-side-logout" title="Log out" onClick={()=>void signOut()}>↪</button>
+      </div>
     </aside>
-    <main className="main"><header className="page-header"><div><p className="eyebrow">YOUR GYM, ORGANIZED</p><h1>{page}</h1><p className="subheading">{user.role==="admin"?"Administrator workspace":"Your personal gym workspace"}</p></div><span className={apiStatus==="Connected"?"api-status connected":"api-status"}><span className="status-dot"/> API: {apiStatus}</span></header>
-      {authError&&<div className="gt-alert error">{authError}</div>}
+    <main className="main">
+      <header className="page-header"><div><p className="eyebrow">YOUR GYM, ORGANIZED</p><h1>{page==="Workouts"?"Workout Plans":page}</h1><p className="subheading">{user.role==="admin"?"Administrator workspace":"Your personal gym workspace"}</p></div><span className={apiStatus==="Connected"?"api-status connected":"api-status"}><span className="status-dot"/> API: {apiStatus}</span></header>
       {page==="Overview"&&<Overview user={user}/>}
-      {module&&<DataModule name={page} user={user}/>}
-      {page==="Groups"&&<GroupsPage/>}
+      {user.role==="admin"&&page==="People"&&<PeoplePage user={user}/>}
+      {user.role==="admin"&&page==="Operations"&&<OperationsPage user={user}/>}
+      {user.role==="admin"&&page==="Workouts"&&<DataModule name="Workout Plans" user={user}/>}
+      {page==="My Membership"&&user.role==="user"&&<MemberPortalPage section="My Membership" user={user}/>}
+      {page==="My Attendance"&&user.role==="user"&&<MemberPortalPage section="My Attendance" user={user}/>}
+      {page==="My Workouts"&&user.role==="user"&&<MemberPortalPage section="My Workouts" user={user}/>}
       {page==="Administration"&&user.role==="admin"&&<Administration/>}
       {page==="Profile"&&<Profile user={user} onUpdate={setUser} onLogout={()=>void signOut()}/>}
       <footer>GymTrack · CSE309 · React + TypeScript / FastAPI / PostgreSQL</footer>
