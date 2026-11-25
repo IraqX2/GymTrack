@@ -318,20 +318,35 @@ function showValue(value:unknown){if(value===null||value===undefined||value===""
 function Assignments(){
   const [items,setItems]=useState<GymRow[]>([]),[plans,setPlans]=useState<GymRow[]>([]),[members,setMembers]=useState<GymRow[]>([]),[trainers,setTrainers]=useState<GymRow[]>([]);
   const [form,setForm]=useState({plan_id:0,member_id:0,trainer_id:0,start_date:new Date().toISOString().slice(0,10),status:"active"});
-  const [error,setError]=useState("");
+  const [error,setError]=useState(""),[saving,setSaving]=useState(false),[removing,setRemoving]=useState<number|null>(null);
   const load=useCallback(async()=>{try{const [a,p,m,t]=await Promise.all([api<GymRow[]>("/api/workout-assignments"),api<GymRow[]>("/api/workout-plans"),api<GymRow[]>("/api/members"),api<GymRow[]>("/api/trainers")]);setItems(a);setPlans(p);setMembers(m);setTrainers(t);setForm(old=>({...old,plan_id:old.plan_id||p[0]?.id||0,member_id:old.member_id||m[0]?.id||0}));}catch(e){setError(e instanceof Error?e.message:"Could not load assignments");}},[]);
   useEffect(()=>{void load();},[load]);
-  async function add(event:FormEvent){event.preventDefault();setError("");try{await api("/api/workout-assignments","POST",{...form,trainer_id:form.trainer_id||null});await load();}catch(e){setError(e instanceof Error?e.message:"Could not assign workout");}}
-  async function remove(id:number){if(!window.confirm("Remove this workout assignment?"))return;try{await api("/api/workout-assignments/"+id,"DELETE");await load();}catch(e){setError(e instanceof Error?e.message:"Could not remove assignment");}}
+  async function add(event:FormEvent){
+    event.preventDefault();
+    if(saving)return;
+    setSaving(true);setError("");
+    try{
+      await api("/api/workout-assignments","POST",{...form,trainer_id:form.trainer_id||null});
+      await load();
+    }catch(e){setError(e instanceof Error?e.message:"Could not assign workout");}
+    finally{setSaving(false);}
+  }
+  async function remove(id:number){
+    if(removing!==null||!window.confirm("Remove this workout assignment?"))return;
+    setRemoving(id);setError("");
+    try{await api("/api/workout-assignments/"+id,"DELETE");await load();}
+    catch(e){setError(e instanceof Error?e.message:"Could not remove assignment");}
+    finally{setRemoving(null);}
+  }
   return <section className="gt-panel"><p className="gt-eyebrow">WORKOUT ALLOCATION</p><h3>Assign a plan to a member</h3>{error&&<div className="gt-alert error">{error}</div>}
     {!plans.length||!members.length?<p className="gt-empty">Create at least one plan and one member before assigning a workout.</p>:<form className="gt-form-grid" onSubmit={add}>
-      <label className="gt-field">Plan<select value={form.plan_id} onChange={e=>setForm({...form,plan_id:Number(e.target.value)})}>{plans.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
-      <label className="gt-field">Member<select value={form.member_id} onChange={e=>setForm({...form,member_id:Number(e.target.value)})}>{members.map(x=><option key={x.id} value={x.id}>{x.full_name} (#{x.id})</option>)}</select></label>
-      <label className="gt-field">Trainer<select value={form.trainer_id} onChange={e=>setForm({...form,trainer_id:Number(e.target.value)})}><option value={0}>No trainer</option>{trainers.map(x=><option key={x.id} value={x.id}>{x.full_name}</option>)}</select></label>
-      <label className="gt-field">Start date<input type="date" value={form.start_date} onChange={e=>setForm({...form,start_date:e.target.value})}/></label>
-      <div className="gt-form-actions"><button className="gt-primary">Assign plan</button></div>
+      <label className="gt-field">Plan<select disabled={saving} value={form.plan_id} onChange={e=>setForm({...form,plan_id:Number(e.target.value)})}>{plans.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
+      <label className="gt-field">Member<select disabled={saving} value={form.member_id} onChange={e=>setForm({...form,member_id:Number(e.target.value)})}>{members.map(x=><option key={x.id} value={x.id}>{x.full_name} (#{x.id})</option>)}</select></label>
+      <label className="gt-field">Trainer<select disabled={saving} value={form.trainer_id} onChange={e=>setForm({...form,trainer_id:Number(e.target.value)})}><option value={0}>No trainer</option>{trainers.map(x=><option key={x.id} value={x.id}>{x.full_name}</option>)}</select></label>
+      <label className="gt-field">Start date<input disabled={saving} type="date" value={form.start_date} onChange={e=>setForm({...form,start_date:e.target.value})}/></label>
+      <div className="gt-form-actions"><button className="gt-primary" disabled={saving}>{saving?"Assigning…":"Assign plan"}</button></div>
     </form>}
-    <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>ID</th><th>Plan</th><th>Member</th><th>Status</th><th></th></tr></thead><tbody>{items.map(x=><tr key={x.id}><td>#{x.id}</td><td>{x.plan_id}</td><td>{x.member_id}</td><td>{x.status}</td><td><button className="danger" onClick={()=>void remove(x.id)}>Remove</button></td></tr>)}</tbody></table></div>
+    <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>ID</th><th>Plan</th><th>Member</th><th>Status</th><th></th></tr></thead><tbody>{items.map(x=><tr key={x.id}><td>#{x.id}</td><td>{x.plan_id}</td><td>{x.member_id}</td><td>{x.status}</td><td><button className="danger" disabled={removing!==null} onClick={()=>void remove(x.id)}>{removing===x.id?"Removing…":"Remove"}</button></td></tr>)}</tbody></table></div>
   </section>;
 }
 
