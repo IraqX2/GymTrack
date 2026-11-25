@@ -740,6 +740,35 @@ def create_group(data: GroupBody, user: CURRENT, db: DB, request: Request):
     return {"id": row.id, "name": row.name, "my_role": "owner"}
 
 
+@app.patch("/api/groups/{group_id}")
+def rename_group(group_id: int, data: GroupBody, user: CURRENT, db: DB, request: Request):
+    membership = get_group_member(db, group_id, user.id)
+    if membership.role != "owner":
+        raise HTTPException(403, "Only the group owner can rename this group")
+    group = db.get(GymGroup, group_id)
+    if not group:
+        raise HTTPException(404, "Group not found")
+    group.name = data.name.strip()
+    db.add(group)
+    db.commit()
+    audit(db, request, "group_renamed", user, "group", group_id, group.name)
+    return {"id": group.id, "name": group.name, "my_role": membership.role}
+
+
+@app.delete("/api/groups/{group_id}", status_code=204)
+def delete_group(group_id: int, user: CURRENT, db: DB, request: Request):
+    membership = get_group_member(db, group_id, user.id)
+    if membership.role != "owner":
+        raise HTTPException(403, "Only the group owner can delete this group")
+    group = db.get(GymGroup, group_id)
+    if not group:
+        raise HTTPException(404, "Group not found")
+    db.delete(group)
+    db.commit()
+    audit(db, request, "group_deleted", user, "group", group_id, group.name)
+    return Response(status_code=204)
+
+
 @app.get("/api/groups/{group_id}/members")
 def group_members(group_id: int, user: CURRENT, db: DB):
     get_group_member(db, group_id, user.id)
