@@ -1,6 +1,6 @@
 import csv, hashlib, hmac, io, os, secrets, uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 
 import jwt
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
@@ -77,6 +77,22 @@ class Attendance(SQLModel, table=True):
     check_out: datetime | None = None
     notes: str = ""
     recorded_by: int | None = Field(default=None, foreign_key="user.id")
+
+
+class AttendanceRequest(SQLModel, table=True):
+    __tablename__ = "attendance_request"
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    member_id: int = Field(foreign_key="member.id", index=True)
+    requested_check_in: datetime
+    requested_check_out: datetime | None = None
+    notes: str = ""
+    status: str = "pending"
+    reviewed_by: int | None = Field(default=None, foreign_key="user.id")
+    reviewed_at: datetime | None = None
+    review_note: str = ""
+    attendance_id: int | None = Field(default=None, foreign_key="attendance.id", unique=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class WorkoutPlan(SQLModel, table=True):
@@ -191,7 +207,18 @@ class MembershipBody(BaseModel):
 
 class AttendanceBody(BaseModel):
     member_id: int
+    check_in: datetime | None = None
+    check_out: datetime | None = None
     notes: str = PField(default="", max_length=500)
+
+class AttendanceRequestBody(BaseModel):
+    requested_check_in: datetime
+    requested_check_out: datetime | None = None
+    notes: str = PField(default="", max_length=500)
+
+class AttendanceRequestReview(BaseModel):
+    status: Literal["approved", "rejected"]
+    review_note: str = PField(default="", max_length=500)
 
 class PlanBody(BaseModel):
     title: str = PField(min_length=2, max_length=120)
@@ -679,9 +706,25 @@ def remove_trainer(trainer_id: int, user: ADMIN, db: DB, request: Request):
 # Memberships
 @app.get("/api/memberships")
 def memberships(user: CURRENT, db: DB):
-    query = select(Membership).order_by(Membership.created_at.desc())
-    if user.role != "admin": query = query.where(Membership.member_id == get_my_member(db, user).id)
-    return db.exec(query).all()
+    query = select(Membership, Member).join(Member, Member.id == Membership.member_id)
+    if user.role != "admin":
+        query = query.where(Membership.member_id == get_my_member(db, user).id)
+    rows = db.exec(query.order_by(Membership.created_at.desc())).all()
+    return [
+        {
+            "id": membership.id,
+            "member_id": membership.member_id,
+            "member_name": member.full_name,
+            "member_email": member.email,
+            "plan_name": membership.plan_name,
+            "start_date": membership.start_date,
+            "end_date": membership.end_date,
+            "price": membership.price,
+            "status": membership.status,
+            "created_at": membership.created_at,
+        }
+        for membership, member in rows
+    ]
 
 
 @app.post("/api/memberships", status_code=201)
@@ -715,11 +758,33 @@ def remove_membership(membership_id: int, user: ADMIN, db: DB, request: Request)
 
 
 # Attendance
+def as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 @app.get("/api/attendance")
 def attendance(user: CURRENT, db: DB, limit: int = Query(100, ge=1, le=200)):
-    query = select(Attendance).order_by(Attendance.check_in.desc()).limit(limit)
-    if user.role != "admin": query = query.where(Attendance.member_id == get_my_member(db, user).id)
-    return db.exec(query).all()
+    query = select(Attendance, Member).join(Member, Member.id == Attendance.member_id)
+    if user.role != "admin":
+        query = query.where(Attendance.member_id == get_my_member(db, user).id)
+    rows = db.exec(query.order_by(Attendance.check_in.desc()).limit(limit)).all()
+    return [
+        {
+            "id": visit.id,
+            "member_id": visit.member_id,
+            "member_name": member.full_name,
+            "member_email": member.email,
+            "check_in": visit.check_in,
+            "check_out": visit.check_out,
+            "notes": visit.notes,
+            "recorded_by": visit.recorded_by,
+        }
+        for visit, member in rows
+    ]
 
 
 @app.post("/api/attendance", status_code=201)
@@ -729,15 +794,26 @@ def record_attendance(data: AttendanceBody, user: ADMIN, db: DB, request: Reques
         raise HTTPException(404, "Member not found")
     if not member.is_active:
         raise HTTPException(409, "This member is inactive.")
-    open_visit = db.exec(
-        select(Attendance).where(
-            Attendance.member_id == data.member_id,
-            Attendance.check_out.is_(None),
-        )
-    ).first()
-    if open_visit:
-        raise HTTPException(409, "This member is already checked in.")
-    row = Attendance(member_id=data.member_id, notes=data.notes, recorded_by=user.id)
+    check_in = as_utc(data.check_in) or now()
+    check_out = as_utc(data.check_out)
+    if check_out and check_out <= check_in:
+        raise HTTPException(422, "Check-out time must be after check-in time.")
+    if check_out is None:
+        open_visit = db.exec(
+            select(Attendance).where(
+                Attendance.member_id == data.member_id,
+                Attendance.check_out.is_(None),
+            )
+        ).first()
+        if open_visit:
+            raise HTTPException(409, "This member is already checked in.")
+    row = Attendance(
+        member_id=data.member_id,
+        check_in=check_in,
+        check_out=check_out,
+        notes=data.notes,
+        recorded_by=user.id,
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -757,6 +833,143 @@ def attendance_checkout(attendance_id: int, user: ADMIN, db: DB, request: Reques
     db.commit()
     audit(db, request, "attendance_checkout", user, "attendance", row.id)
     return row
+
+
+# Member attendance correction requests, reviewed by an administrator.
+def attendance_request_view(request_row: AttendanceRequest, member: Member, account: AppUser):
+    return {
+        "id": request_row.id,
+        "user_id": request_row.user_id,
+        "member_id": request_row.member_id,
+        "member_name": member.full_name,
+        "member_email": member.email,
+        "requested_check_in": request_row.requested_check_in,
+        "requested_check_out": request_row.requested_check_out,
+        "notes": request_row.notes,
+        "status": request_row.status,
+        "reviewed_by": request_row.reviewed_by,
+        "reviewed_at": request_row.reviewed_at,
+        "review_note": request_row.review_note,
+        "attendance_id": request_row.attendance_id,
+        "created_at": request_row.created_at,
+    }
+
+
+@app.get("/api/attendance/requests")
+def list_attendance_requests(user: CURRENT, db: DB, status: str = ""):
+    query = (
+        select(AttendanceRequest, Member, AppUser)
+        .join(Member, Member.id == AttendanceRequest.member_id)
+        .join(AppUser, AppUser.id == AttendanceRequest.user_id)
+    )
+    if user.role != "admin":
+        query = query.where(AttendanceRequest.user_id == user.id)
+    if status in {"pending", "approved", "rejected"}:
+        query = query.where(AttendanceRequest.status == status)
+    rows = db.exec(query.order_by(AttendanceRequest.created_at.desc()).limit(100)).all()
+    return [attendance_request_view(request_row, member, account) for request_row, member, account in rows]
+
+
+@app.post("/api/attendance/requests", status_code=201)
+def create_attendance_request(
+    data: AttendanceRequestBody,
+    user: CURRENT,
+    db: DB,
+    request: Request,
+):
+    if user.role != "user":
+        raise HTTPException(403, "Attendance requests are for member accounts.")
+    member = get_my_member(db, user)
+    check_in = as_utc(data.requested_check_in)
+    check_out = as_utc(data.requested_check_out)
+    if check_out and check_out <= check_in:
+        raise HTTPException(422, "Check-out time must be after check-in time.")
+    duplicate = db.exec(
+        select(AttendanceRequest).where(
+            AttendanceRequest.user_id == user.id,
+            AttendanceRequest.requested_check_in == check_in,
+            AttendanceRequest.status == "pending",
+        )
+    ).first()
+    if duplicate:
+        raise HTTPException(409, "You already have a pending request for this check-in time.")
+    row = AttendanceRequest(
+        user_id=user.id,
+        member_id=member.id,
+        requested_check_in=check_in,
+        requested_check_out=check_out,
+        notes=data.notes,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    audit(db, request, "attendance_request_created", user, "attendance_request", row.id)
+    return {"id": row.id, "status": row.status, "requested_check_in": row.requested_check_in}
+
+
+@app.patch("/api/attendance/requests/{request_id}")
+def review_attendance_request(
+    request_id: int,
+    data: AttendanceRequestReview,
+    user: ADMIN,
+    db: DB,
+    request: Request,
+):
+    request_row = db.get(AttendanceRequest, request_id)
+    if not request_row:
+        raise HTTPException(404, "Attendance request not found")
+    if request_row.status != "pending":
+        raise HTTPException(409, "This attendance request has already been reviewed.")
+    if data.status == "approved":
+        member = db.get(Member, request_row.member_id)
+        if not member or not member.is_active:
+            raise HTTPException(409, "The linked member is missing or inactive.")
+        if request_row.requested_check_out is None:
+            open_visit = db.exec(
+                select(Attendance).where(
+                    Attendance.member_id == request_row.member_id,
+                    Attendance.check_out.is_(None),
+                )
+            ).first()
+            if open_visit:
+                raise HTTPException(409, "This member already has an open attendance visit.")
+        visit = Attendance(
+            member_id=request_row.member_id,
+            check_in=request_row.requested_check_in,
+            check_out=request_row.requested_check_out,
+            notes=("Member request: " + request_row.notes).strip()[:500],
+            recorded_by=user.id,
+        )
+        db.add(visit)
+        db.flush()
+        request_row.attendance_id = visit.id
+    request_row.status = data.status
+    request_row.reviewed_by = user.id
+    request_row.reviewed_at = now()
+    request_row.review_note = data.review_note.strip()
+    db.add(request_row)
+    db.commit()
+    db.refresh(request_row)
+    audit(
+        db, request, "attendance_request_" + data.status,
+        user, "attendance_request", request_row.id, data.review_note,
+    )
+    return {"id": request_row.id, "status": request_row.status, "attendance_id": request_row.attendance_id}
+
+
+@app.delete("/api/attendance/requests/{request_id}", status_code=204)
+def remove_attendance_request(request_id: int, user: CURRENT, db: DB, request: Request):
+    request_row = db.get(AttendanceRequest, request_id)
+    if not request_row:
+        raise HTTPException(404, "Attendance request not found")
+    if user.role != "admin" and (
+        request_row.user_id != user.id or request_row.status != "pending"
+    ):
+        raise HTTPException(403, "You can only cancel your own pending request.")
+    db.delete(request_row)
+    db.commit()
+    audit(db, request, "attendance_request_removed", user, "attendance_request", request_id)
+    return Response(status_code=204)
 
 
 # Workout plans and assignments
