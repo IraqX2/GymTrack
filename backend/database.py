@@ -1,6 +1,5 @@
 import os
 from collections.abc import Generator
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
@@ -18,12 +17,18 @@ raw_url = configured_url or "sqlite:///./gymtrack.db"
 if raw_url.startswith(("postgres://", "postgresql://")):
     raw_url = "postgresql+psycopg://" + raw_url.split("://", 1)[1]
 
-# Supabase/Vercel may add query flags that libpq does not recognize.
+# Remove Supabase/Vercel helper query flags without parsing the authority/host.
+# urllib.parse.urlsplit can reject a transaction-pooler URI before SQLAlchemy
+# gets a chance to handle it. Connection options needed by psycopg are passed
+# through connect_args below.
 if raw_url.startswith("postgresql+psycopg://"):
-    parts = urlsplit(raw_url)
-    query = [(key, value) for key, value in parse_qsl(parts.query)
-             if key not in {"supa", "pgbouncer"}]
-    raw_url = urlunsplit(parts._replace(query=urlencode(query)))
+    base_url, separator, query_string = raw_url.partition("?")
+    if separator:
+        supported = [
+            item for item in query_string.split("&")
+            if item and item.split("=", 1)[0].lower() not in {"supa", "pgbouncer"}
+        ]
+        raw_url = base_url + (("?" + "&".join(supported)) if supported else "")
 
 DATABASE_URL = raw_url
 if DATABASE_URL.startswith("sqlite"):
