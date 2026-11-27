@@ -770,8 +770,11 @@ function GroupsPage({user}:{user:GymUser}){
 }
 
 function Administration({user}:{user:GymUser}){
-  const [tab,setTab]=useState<"Users"|"Groups"|"Activity"|"Security">("Users");
+  const [tab,setTab]=useState<"Users"|"Groups"|"Activity"|"Security"|"Content">("Users");
   const [users,setUsers]=useState<GymRow[]>([]),[logs,setLogs]=useState<GymRow[]>([]);
+  const [contentType,setContentType]=useState<"memberships"|"attendance"|"workout_plans"|"assignments"|"groups"|"workout_progress">("memberships");
+  const [content,setContent]=useState<{items:{id:number;label:string;details:string;created_at:string}[];total:number}>({items:[],total:0});
+  const [contentOffset,setContentOffset]=useState(0),[selectedContentIds,setSelectedContentIds]=useState<number[]>([]);
   const [userTotal,setUserTotal]=useState(0),[userOffset,setUserOffset]=useState(0);
   const [userRole,setUserRole]=useState(""),[userStatus,setUserStatus]=useState("");
   const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[]}>({failed_logins_24h:0,events:[]});
@@ -787,11 +790,39 @@ function Administration({user}:{user:GymUser}){
         setUsers(result.items);setUserTotal(result.total);
       }
       if(tab==="Activity")setLogs(await api<GymRow[]>("/api/admin/activity?q="+encodeURIComponent(query)));
+      if(tab==="Content"){
+        const params=new URLSearchParams({type:contentType,q:query,offset:String(contentOffset),limit:String(pageSize)});
+        setContent(await api("/api/admin/content?"+params.toString()));
+      }
       if(tab==="Security")setSecurity(await api("/api/admin/security"));
       setError("");
     }catch(e){setError(e instanceof Error?e.message:"Could not load admin information");}
-  },[tab,query,userRole,userStatus,userOffset]);
+  },[tab,query,userRole,userStatus,userOffset,contentType,contentOffset]);
   useEffect(()=>{void load();},[load]);
+  async function deleteContentItem(id:number){
+    if(!window.confirm("Permanently delete this content record? This cannot be undone."))return;
+    try{
+      await api(`/api/admin/content/${contentType}/${id}`,"DELETE");
+      setSelectedContentIds(current=>current.filter(value=>value!==id));
+      await load();
+    }catch(e){setError(e instanceof Error?e.message:"Could not delete content record");}
+  }
+  async function bulkDeleteContent(){
+    if(!selectedContentIds.length)return;
+    if(!window.confirm(`Permanently delete ${selectedContentIds.length} selected records?`))return;
+    try{
+      await api(`/api/admin/content/${contentType}/bulk-delete`,"POST",{ids:selectedContentIds});
+      setSelectedContentIds([]);
+      await load();
+    }catch(e){setError(e instanceof Error?e.message:"Bulk content deletion failed");}
+  }
+  function toggleContentSelection(id:number,checked:boolean){
+    setSelectedContentIds(current=>checked?[...new Set([...current,id])]:current.filter(value=>value!==id));
+  }
+  function toggleCurrentContentPage(checked:boolean){
+    const pageIds=content.items.map(row=>row.id);
+    setSelectedContentIds(current=>checked?[...new Set([...current,...pageIds])]:current.filter(id=>!pageIds.includes(id)));
+  }
   function toggleUserSelection(id:number,checked:boolean){
     setSelectedUserIds(current=>checked?[...new Set([...current,id])]:current.filter(value=>value!==id));
   }
@@ -821,14 +852,21 @@ function Administration({user}:{user:GymUser}){
   async function ban(row:GymRow){if(row.is_banned){try{await api("/api/admin/users/"+row.id+"/unban","POST");await load();}catch(e){setError(e instanceof Error?e.message:"Could not unban user");}return;}const reason=window.prompt("Ban reason:");if(reason===null)return;try{await api("/api/admin/users/"+row.id+"/ban","POST",{reason});await load();}catch(e){setError(e instanceof Error?e.message:"Could not ban user");}}
   async function revoke(row:GymRow){if(!window.confirm("Revoke all sessions for "+row.email+"?"))return;try{await api("/api/admin/users/"+row.id+"/revoke-sessions","POST");}catch(e){setError(e instanceof Error?e.message:"Could not revoke sessions");}}
   return <div className="gt-page-stack"><section className="gt-section-title"><div><p className="gt-eyebrow">SYSTEM CONTROL</p><h2>Administration</h2><p className="gt-muted">Manage accounts, review activity and monitor security.</p></div></section>
-    <div className="gt-tabbar">{(["Users","Groups","Activity","Security"] as const).map(item=><button className={tab===item?"active":""} key={item} onClick={()=>setTab(item)}>{item}</button>)}</div>
+    <div className="gt-tabbar">{(["Users","Groups","Activity","Security","Content"] as const).map(item=><button className={tab===item?"active":""} key={item} onClick={()=>setTab(item)}>{item}</button>)}</div>
     {error&&<div className="gt-alert error">{error}</div>}
-    <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>{setQuery(e.target.value);setUserOffset(0);}}/>}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
+    <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>{setQuery(e.target.value);setUserOffset(0);setContentOffset(0);}}/>}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
+      {tab==="Content"&&<label className="gt-field">Record type<select value={contentType} onChange={e=>{setContentType(e.target.value as typeof contentType);setContentOffset(0);setSelectedContentIds([]);}}><option value="memberships">Memberships</option><option value="attendance">Attendance</option><option value="workout_plans">Workout plans</option><option value="assignments">Workout assignments</option><option value="groups">Groups</option><option value="workout_progress">Trainer progress</option></select></label>}
       {tab==="Users"&&<div className="gt-panel-tools">
         <label className="gt-field">Role<select value={userRole} onChange={e=>{setUserRole(e.target.value);setUserOffset(0);}}><option value="">All roles</option><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></label>
         <label className="gt-field">Status<select value={userStatus} onChange={e=>{setUserStatus(e.target.value);setUserOffset(0);}}><option value="">All statuses</option><option value="active">Active</option><option value="banned">Banned</option></select></label>
       </div>}
       {tab==="Groups"&&<GroupsPage user={user}/>}
+      {tab==="Content"&&<><div className="gt-panel-tools"><span className="gt-muted">{selectedContentIds.length} selected · {content.total} matching records</span><button className="gt-danger-outline" disabled={!selectedContentIds.length} onClick={()=>void bulkDeleteContent()}>Delete selected</button></div>
+        <div className="gt-table-wrap"><table className="gt-table"><thead><tr><th><input aria-label="Select current content page" type="checkbox" checked={content.items.length>0&&content.items.every(row=>selectedContentIds.includes(row.id))} onChange={e=>toggleCurrentContentPage(e.target.checked)}/></th><th>ID</th><th>Record</th><th>Details</th><th>Date</th><th>Action</th></tr></thead><tbody>
+          {content.items.map(row=><tr key={row.id}><td><input aria-label={"Select record "+row.id} type="checkbox" checked={selectedContentIds.includes(row.id)} onChange={e=>toggleContentSelection(row.id,e.target.checked)}/></td><td>{row.id}</td><td>{row.label}</td><td>{row.details}</td><td>{row.created_at?new Date(row.created_at).toLocaleDateString():"—"}</td><td><button className="gt-danger-outline" onClick={()=>void deleteContentItem(row.id)}>Delete</button></td></tr>)}
+        </tbody></table></div>
+        <div className="gt-panel-head"><span className="gt-muted">{content.total===0?"No records found":`Showing ${contentOffset+1}–${Math.min(contentOffset+content.items.length,content.total)} of ${content.total}`}</span><div className="gt-panel-tools"><button className="gt-secondary" disabled={contentOffset===0} onClick={()=>setContentOffset(Math.max(0,contentOffset-20))}>Previous</button><button className="gt-secondary" disabled={contentOffset+20>=content.total} onClick={()=>setContentOffset(contentOffset+20)}>Next</button></div></div>
+      </>}
       {tab==="Users"&&detailLoading&&<section className="gt-panel"><p className="gt-empty">Loading account detail…</p></section>}
       {tab==="Users"&&detail&&!detailLoading&&<section className="gt-panel">
         <div className="gt-panel-head"><div><p className="gt-eyebrow">ACCOUNT DETAIL</p><h3>{detail.user.full_name}</h3><p className="gt-muted">{detail.user.email} · {detail.user.role} · {detail.user.is_banned?"Banned":"Active"}</p></div><button className="gt-secondary" onClick={()=>setDetail(null)}>Close</button></div>
