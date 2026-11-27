@@ -1,67 +1,66 @@
 # GymTrack requirements traceability
 
-This document maps the GymTrack implementation to the original project documents and the CSE309 final-project expectations.
+This document maps GymTrack to the CSE309 Autumn 2026 final-project expectations and records the extra trainer workflow.
 
-## Roles and product scope
+## Roles
 
-The original GymTrack PRD describes:
+- **Admin:** manages gym records, accounts, roles and shared groups.
+- **User/member:** created by public signup; views their own membership, attendance and assigned workouts.
+- **Trainer:** a normal registered account that an administrator promotes. It keeps its member profile and receives a trainer workspace for assigned trainees and workouts.
 
-- **Administrator:** manages member and trainer records, memberships, attendance and workout plans.
-- **Trainer:** works with assigned workout plans and member progress. Separate trainer permissions are listed as later-version work in the original PRD/SRS.
-- **Member:** views their own membership, attendance history and assigned workouts.
+The course brief requires normal user and admin roles. GymTrack adds trainer as a third application role without allowing public signup to choose privileged access.
 
-The final CSE309 project brief adds mandatory account security, role-based access control, admin management, persistent deployment and shared groups/teams with mixed member permissions. Those final course requirements take precedence where the initial GymTrack draft has narrower scope.
-
-The deployed application currently uses two account roles: `admin` and `user`. A trainer is a gym staff record, not a separate login role.
-
-## Implemented workflows
+## Implemented workflows in source
 
 | Requirement | Implementation |
 |---|---|
-| Member records | Admin creates, views, updates and removes member records |
-| Trainer records | Admin manages trainer records |
-| Memberships | Admin selects a member, chooses a plan duration, records dates, price and status; members see only their own records |
-| Attendance | Admin selects a member and records visit date, check-in and optional check-out time; open visits can be checked out later |
-| Member attendance access | Members see their own visit history |
-| Attendance requests | Members can submit a dated check-in request; admins approve it into the official attendance log or reject/remove it |
-| Workout plans | Admin manages plans and assigns them to members and trainers |
-| Member dashboard | Members see their own membership, attendance and assigned workouts |
-| Authentication | Signup/login, Argon2 password hashing, signed short-lived JWT access tokens, rotating HttpOnly refresh sessions, logout and session revocation |
-| Authorization | FastAPI dependencies check account role and ownership for protected routes |
+| Signup/login | FastAPI authentication routes with Argon2 password hashing |
+| Access token | Signed JWT, 15-minute lifetime, identity and role claims, account reload on protected requests |
+| Refresh/logout | HttpOnly refresh cookie, stored token hash, token rotation and revocation |
+| Sessions | List/revoke own sessions; admin can revoke all sessions for an account |
+| Profile/password | Profile update and password change with current password verification |
+| Member ownership | Member dashboard, memberships, attendance, requests and workouts filtered to signed-in member |
+| Admin authorization | Shared FastAPI admin dependency |
+| Trainer promotion | Admin role selector; public signup always creates normal user |
+| Trainer profile | Promotion creates/reactivates a trainer record linked by normalized email |
+| Trainer dashboard | Shows only assignments linked to signed-in trainer's profile |
+| Trainer progress | Trainer can view and write progress only for their own assignments |
+| Gym records | Admin screens for member/trainer CRUD, memberships, attendance, workout plans and assignments |
+| Attendance requests | Member submits; admin approves/rejects |
 | Administration | Account search, role changes, ban/unban, session revocation, activity/security views and CSV exports |
-| Shared groups | Admin creates a team and adds registered users with independent create, edit and assign permissions; the owner alone can rename/delete the team and manage membership |
-| Persistent deployment | React frontend and FastAPI backend are deployed through Vercel and use Supabase PostgreSQL |
+| Shared groups | Owner-managed membership and server-enforced create/edit/assign permissions |
+| Database | Supabase PostgreSQL for deployment; local SQLite only for local development |
+| Frontend/backend separation | React calls FastAPI through the shared frontend API service |
 
-## Group permission model
+## Trainer permissions
 
-Groups are shared workspaces required by the final CSE309 project brief. They are not gym memberships or class schedules.
+A trainer is not an administrator. A trainer cannot manage accounts, membership plans, global workout plans or gym staff. They see only member details included in assignments allocated to their trainer profile. The backend checks assignment ownership again before returning or saving progress.
 
-An administrator creates the group and is its owner. The owner can add registered accounts, grant or revoke three permissions, rename the group and delete it.
+The trainer profile is linked to an account by normalized email. When an administrator demotes a trainer, the profile is marked inactive and the account returns to the user role. Historical assignments are preserved.
 
-A normal member cannot create or administer groups. They can view a group they belong to and use only the permissions granted to them:
+## Architecture
 
-- **Create:** add a shared task.
-- **Edit:** update shared tasks they did not create.
-- **Assign:** assign a task to another member of the same group.
+The new trainer workflow uses router, service, repository, schema, model and shared auth/audit layers. See [ARCHITECTURE.md](ARCHITECTURE.md). This is an independently implemented MVC-style/layered architecture, not copied source code from the instructor's reference.
 
-FastAPI checks each permission. Hiding a control in the frontend is not treated as an authorization boundary.
+Some older resource endpoints remain in `backend/gymtrack_api.py`; the remaining domain-by-domain refactor is documented as technical debt.
 
-## Database sample data
+## Important outstanding checks against the course brief
 
-The inspected hosted database contains five login accounts: two administrators and three regular users. Each account is linked to a member profile. It also contains one trainer, membership records, attendance records, workout plans and assignments, shared groups and group members, plus a shared task.
+The source does not yet prove every item in the final rubric. Before submission, check or complete:
 
-These records are sample data for checking the workflows. Use test accounts only; do not enter real gym members' personal information.
+- Admin user filters for role/status and visible pagination.
+- User detail view with that user's records, groups, sessions and activity.
+- Bulk ban/unban.
+- Admin content moderation for listing/deleting records and groups.
+- CSV exports for every required record/group category and filter.
+- Automated pytest cases for login, invalid/expired tokens and at least three RBAC rules.
+- Hosted smoke tests for all roles, group permissions, denied requests, session rotation/revocation and persistence.
+- Review Supabase table grants and RLS before any real member information is stored.
 
-## Remaining scope and limitations
+## Deployment and student submission items
 
-- The separate Trainer login role and dedicated progress-history workflow remain outside the current implementation.
-- The final report PDF with required screenshots and the screen-recorded submission video must still be prepared.
-- The Supabase RLS finding requires a deliberate security configuration review before real personal data is used.
-- Build success alone does not prove that every workflow or permission rule works on the deployed URL. Each main role and denied-access case should be tested there.
+Apply `backend/migrations/2026_11_27_trainer_progress.sql` in Supabase before using trainer progress. Configure Vercel environment variables separately; keep secrets private.
 
-## Source documents
+A report PDF with real screenshots and a 5–8 minute voice demo must be prepared from the deployed app. Required screenshots: member view, admin dashboard, RBAC denial, expired-token handling and activity log. Do not present build success as proof of live workflow tests.
 
-- [Product Requirements Document](PRD.md)
-- [Software Requirements Specification](SRS.md)
-- [Technical Design Document](TDD.md)
-- CSE309 final project submission expectations supplied for the Autumn 2026 course
+The instructor requires at least two admin and three normal demo accounts, demo passwords only in private submission fields/report (never README/Git), GitHub/Vercel/API/docs URLs and final report files.
