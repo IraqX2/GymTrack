@@ -855,7 +855,17 @@ function Administration({user}:{user:GymUser}){
       </>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
       {tab==="Security"&&<><div className="gt-security-count"><strong>{security.failed_logins_24h}</strong><span>failed or blocked login events in the last 24 hours</span></div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>Email</th><th>Event</th><th>IP</th><th>Browser</th></tr></thead><tbody>{security.events.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.ip_address||"—"}</td><td>{row.user_agent||"—"}</td></tr>)}</tbody></table></div></>}</section>
-    <section className="gt-panel"><p className="gt-eyebrow">DATA EXPORTS</p><h3>Download reports</h3><div className="gt-export-actions"><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/users","gymtrack-users.csv")}>Users CSV</button><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/members","gymtrack-members.csv")}>Members CSV</button><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/activity","gymtrack-activity.csv")}>Activity CSV</button></div></section>
+    <section className="gt-panel"><p className="gt-eyebrow">DATA EXPORTS</p><h3>Download reports</h3><div className="gt-export-actions">
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/users?"+new URLSearchParams({q:query,role:userRole,status:userStatus}),"gymtrack-users.csv")}>Filtered users CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/members?q="+encodeURIComponent(query),"gymtrack-members.csv")}>Members CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/activity?q="+encodeURIComponent(query),"gymtrack-activity.csv")}>Filtered activity CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/trainers","gymtrack-trainers.csv")}>Trainers CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/memberships","gymtrack-memberships.csv")}>Memberships CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/attendance","gymtrack-attendance.csv")}>Attendance CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/workouts","gymtrack-workout-plans.csv")}>Workout plans CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/assignments","gymtrack-workout-assignments.csv")}>Assignments CSV</button>
+      <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/groups","gymtrack-groups.csv")}>Groups CSV</button>
+    </div></section>
   </div>;
 }
 
