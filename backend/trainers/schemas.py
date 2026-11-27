@@ -25,4 +25,4 @@ class ProgressCreate(BaseModel):
 
 
 class AssignmentStatusUpdate(BaseModel):
-    status: str = Field(pattern="^(active|paused|completed)$")
+    status: str = Field(pattern="^(active|completed|cancelled)$")
