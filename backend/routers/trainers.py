@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Request, Response
 
-from backend.gymtrack_api import ADMIN, DB, TRAINER, audit
-from backend.schemas.trainer import TrainerPayload, TrainerProgressCreate
-from backend.services import trainer_service
+try:
+    from backend.core.audit import audit
+    from backend.core.dependencies import ADMIN, DB, TRAINER
+    from backend.schemas.trainer import TrainerPayload, TrainerProgressCreate
+    from backend.services import trainer_service
+except ModuleNotFoundError:
+    from core.audit import audit
+    from core.dependencies import ADMIN, DB, TRAINER
+    from schemas.trainer import TrainerPayload, TrainerProgressCreate
+    from services import trainer_service
 
 router = APIRouter(tags=["trainers"])
 
