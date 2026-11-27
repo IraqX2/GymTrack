@@ -1,12 +1,20 @@
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from backend.models.member import Member
-from backend.models.trainer import Trainer
-from backend.models.trainer_progress import WorkoutProgress
-from backend.models.workout import WorkoutAssignment
-from backend.repositories import trainer_repository as repository
-from backend.schemas.trainer import TrainerPayload, TrainerProgressCreate
+try:
+    from backend.models.member import Member
+    from backend.models.trainer import Trainer
+    from backend.models.trainer_progress import WorkoutProgress
+    from backend.models.workout import WorkoutAssignment
+    from backend.repositories import trainer_repository as repository
+    from backend.schemas.trainer import TrainerPayload, TrainerProgressCreate
+except ModuleNotFoundError:
+    from models.member import Member
+    from models.trainer import Trainer
+    from models.trainer_progress import WorkoutProgress
+    from models.workout import WorkoutAssignment
+    from repositories import trainer_repository as repository
+    from schemas.trainer import TrainerPayload, TrainerProgressCreate
 
 
 def list_trainer_records(session: Session) -> list[Trainer]:
