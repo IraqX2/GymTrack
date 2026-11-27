@@ -26,7 +26,7 @@ The trainer feature follows an MVC-style layered architecture:
 |---|---|
 | backend/models/trainer.py | Trainer staff model |
 | backend/models/workout.py | Workout plan and assignment models |
-| backend/models/trainer_progress.py | Progress history model |
+| backend/models/trainer_progress.py | Model for the existing public.trainer_progress table |
 | backend/schemas/trainer.py | Role and progress request validation |
 | backend/repositories/trainer_repository.py | Trainer and assignment queries |
 | backend/services/trainer_service.py | Promotion, assignment ownership and progress rules |
@@ -58,7 +58,7 @@ Older resource endpoints remain in backend/gymtrack_api.py and are documented as
 
 ## 6. Database and migration
 
-Local development defaults to SQLite. Vercel requires DATABASE_URL and must use hosted PostgreSQL. The trainer progress table is created by applying backend/migrations/2026_11_27_trainer_progress.sql to Supabase. Hosted schema must not be assumed to update from SQLModel create_all at server startup.
+Local development defaults to SQLite. Vercel requires DATABASE_URL and must use hosted PostgreSQL. The production GymTrack Supabase project already contains `public.trainer_progress` from migration `20261127071138_gymtrack_trainer_access_and_private_tables`; the application maps to that table, so no duplicate table migration is needed. Hosted schema must not be assumed to update from SQLModel create_all at server startup.
 
 ## 7. Deployment
 
