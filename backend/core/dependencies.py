@@ -6,8 +6,12 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session
 
-from backend.database import get_session
-from backend.models.user import AppUser
+try:
+    from backend.database import get_session
+    from backend.models.user import AppUser
+except ModuleNotFoundError:
+    from database import get_session
+    from models.user import AppUser
 
 JWT_SECRET = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
 bearer = HTTPBearer(auto_error=False)
