@@ -42,7 +42,7 @@ Older resource endpoints remain in backend/gymtrack_api.py and are documented as
 
 - Signup always creates a user account and links a member profile.
 - An admin changes the account role to trainer.
-- The trainer service finds or creates the trainer profile using normalized email.
+- The trainer service links the trainer profile using `trainer.user_id`, falling back to normalized email for an older profile without an account link.
 - The admin assigns a workout plan and selects the trainer.
 - The trainer dashboard queries assignments by the signed-in trainer ID.
 - Progress reads and writes verify assignment ownership.
