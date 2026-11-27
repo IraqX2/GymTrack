@@ -27,6 +27,11 @@ def find_trainer_by_id(session: Session, trainer_id: int) -> Trainer | None:
     return session.get(Trainer, trainer_id)
 
 
+def find_trainer_by_user_id(session: Session, user_id: int) -> Trainer | None:
+    statement = select(Trainer).where(Trainer.user_id == user_id)
+    return session.exec(statement).first()
+
+
 def add_trainer(session: Session, trainer: Trainer) -> Trainer:
     session.add(trainer)
     session.flush()
@@ -57,7 +62,7 @@ def list_progress_for_assignment(
     statement = (
         select(WorkoutProgress)
         .where(WorkoutProgress.assignment_id == assignment_id)
-        .order_by(WorkoutProgress.recorded_at.desc())
+        .order_by(WorkoutProgress.progress_date.desc(), WorkoutProgress.created_at.desc())
         .limit(limit)
     )
     return list(session.exec(statement).all())
