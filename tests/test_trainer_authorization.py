@@ -82,3 +82,32 @@ def test_trainer_can_record_progress_for_owned_assignment(monkeypatch):
     assert result is saved
     assert result.trainer_id == trainer.id
     assert result.assignment_id == assignment.id
+
+def test_access_token_verification_rejects_tampered_token():
+    from backend.core.dependencies import current_user
+
+    credentials = SimpleNamespace(credentials="this.is.not.a.valid.jwt")
+
+    with pytest.raises(HTTPException) as error:
+        current_user(credentials, object())
+
+    assert error.value.status_code == 401
+
+
+def test_application_registers_trainer_routes():
+    from backend.gymtrack_api import app
+
+    paths = {route.path for route in app.routes}
+    assert "/api/trainer/dashboard" in paths
+    assert "/api/trainer/assignments/{assignment_id}/progress" in paths
+
+
+def test_password_is_hashed_and_can_be_verified():
+    from backend.gymtrack_api import check_password, hash_password
+
+    plain_password = "GymTrack-Demo-Password-2026"
+    password_hash = hash_password(plain_password)
+
+    assert password_hash != plain_password
+    assert check_password(plain_password, password_hash)
+    assert not check_password("incorrect-password", password_hash)
