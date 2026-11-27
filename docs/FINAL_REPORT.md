@@ -188,11 +188,11 @@ Primary tables used by the application include:
 - attendance_request: member-submitted requests awaiting admin review.
 - workout_plan: workout plan definitions.
 - workout_assignment: relation from a member and plan to an optional trainer.
-- workout_progress: trainer progress entries tied to an assignment and trainer.
+- trainer_progress: trainer progress entries tied to an assignment, member and trainer, with a completion percentage, notes, date and creation timestamp.
 - gym_group, gym_group_member, gym_group_task: shared groups and permissions.
 - activity_log: audit history.
 
-The new trainer progress table is defined by backend/migrations/2026_11_27_trainer_progress.sql. It must be applied in Supabase before deploying/using the trainer progress endpoint because the Vercel startup path intentionally does not auto-create hosted tables.
+The hosted GymTrack database already has `public.trainer_progress`, created by the existing migration `20261127071138_gymtrack_trainer_access_and_private_tables`. The application maps to that existing table; no duplicate progress table or additional production migration is required.
 
 ## 13. Authentication and authorization flow
 
