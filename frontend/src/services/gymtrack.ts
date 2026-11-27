@@ -4,6 +4,8 @@ export type GymUser = {
   email: string;
   role: "admin" | "user";
   is_banned: boolean;
+  is_trainer?: boolean;
+  trainer_id?: number | null;
   member_id?: number | null;
 };
 
