@@ -97,7 +97,7 @@ def test_access_token_verification_rejects_tampered_token():
 def test_application_registers_trainer_routes():
     from backend.gymtrack_api import app
 
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/api/trainer/dashboard" in paths
     assert "/api/trainer/assignments/{assignment_id}/progress" in paths
 
