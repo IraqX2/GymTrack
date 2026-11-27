@@ -85,7 +85,7 @@ Online payment processing, biometric entry, nutrition plans, mobile applications
 | FR-10 | Manage memberships and attendance | Membership and attendance endpoints |
 | FR-11 | Review member attendance requests | Member request and admin review workflow |
 | FR-12 | Create and assign workouts | Workout plan and assignment endpoints |
-| FR-13 | Promote a member account to trainer | Admin role selector; trainer profile is linked by normalized email |
+| FR-13 | Promote a member account to trainer | Admin role selector; trainer profile is linked through `trainer.user_id` |
 | FR-14 | View trainer assignments | Trainer-only dashboard endpoint |
 | FR-15 | Record trainer progress | Assignment ownership checked before storing progress |
 | FR-16 | Manage shared groups | Owner-managed group membership |
@@ -128,7 +128,7 @@ Online payment processing, biometric entry, nutrition plans, mobile applications
 1. A visitor signs up using the normal signup form.
 2. The newly created account has the user role and a member profile.
 3. An administrator selects trainer for that account in Administration → Users.
-4. The backend creates or reactivates a trainer staff profile using the account's normalized email.
+4. The backend creates or reactivates a trainer staff profile using the account ID through `trainer.user_id`, with normalized email only as a compatibility fallback.
 5. An administrator assigns a workout plan to a member and selects the trainer profile.
 6. The trainer signs in and opens My Trainees.
 7. The dashboard lists only that trainer's assigned workout/member rows.
@@ -242,7 +242,7 @@ The trainer service resolves the trainer profile and filters workout assignments
 
 ## 16. Validation and error handling
 
-The trainer schemas restrict role values to user, trainer or admin, limit text sizes and restrict progress status to in_progress or completed. The service layer rejects missing or unrelated assignment IDs with 404. Non-trainer accounts are rejected by the trainer dependency with 403.
+The trainer schemas restrict role values to user, trainer or admin, limit text sizes and validate progress completion percentage to the 0–100 range. The service layer rejects missing or unrelated assignment IDs with 404. Non-trainer accounts are rejected by the trainer dependency with 403.
 
 ## 17. Deployment configuration
 
@@ -254,7 +254,7 @@ The Vercel backend requires server-side environment variables:
 - BOOTSTRAP_ADMIN_EMAIL: account permitted to receive initial admin status.
 - FRONTEND_URLS: allowed origins when frontend and API origins differ.
 
-Apply the migration SQL in Supabase first, verify the hosted database connection, and then deploy the feature branch to a preview environment. Production credentials must never be committed to Git.
+The hosted Supabase project already contains the `trainer_progress` table from migration `20261127071138_gymtrack_trainer_access_and_private_tables`; no additional progress-table migration is required. Verify the connection and schema against the target environment before deployment. Production credentials must never be committed to Git.
 
 ---
 
