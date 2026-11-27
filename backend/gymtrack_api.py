@@ -1,11 +1,10 @@
 import csv, hashlib, hmac, io, os, secrets, uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Annotated, Literal
+from typing import Literal
 
 import jwt
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pwdlib import PasswordHash
 from pydantic import BaseModel, EmailStr, Field as PField
 from sqlmodel import Field, Session, SQLModel, select
@@ -16,29 +15,24 @@ try:
     from backend.models.trainer import Trainer
     from backend.models.workout import WorkoutAssignment, WorkoutPlan
     from backend.models.trainer_progress import WorkoutProgress
+    from backend.models.user import AppUser
+    from backend.models.activity import ActivityLog
     from backend.schemas.trainer import RoleChangeBody
+    from backend.core.audit import audit, client_ip
+    from backend.core.dependencies import ADMIN, CURRENT, DB, TRAINER
 except ModuleNotFoundError:
     from database import engine
     from models.member import Member
     from models.trainer import Trainer
     from models.workout import WorkoutAssignment, WorkoutPlan
     from models.trainer_progress import WorkoutProgress
+    from models.user import AppUser
+    from models.activity import ActivityLog
     from schemas.trainer import RoleChangeBody
+    from core.audit import audit, client_ip
+    from core.dependencies import ADMIN, CURRENT, DB, TRAINER
 
 
-# Existing PostgreSQL tables: public."user", public.authsession, public.member.
-class AppUser(SQLModel, table=True):
-    __tablename__ = "user"
-    id: int | None = Field(default=None, primary_key=True)
-    full_name: str
-    email: str = Field(index=True)
-    password_hash: str
-    role: str = "user"
-    is_banned: bool = False
-    failed_login_count: int = 0
-    locked_until: datetime | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AuthSession(SQLModel, table=True):
@@ -129,18 +123,6 @@ class GymGroupTask(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class ActivityLog(SQLModel, table=True):
-    __tablename__ = "activity_log"
-    id: int | None = Field(default=None, primary_key=True)
-    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
-    email: str | None = None
-    action: str
-    entity_type: str | None = None
-    entity_id: str | None = None
-    details: str | None = None
-    ip_address: str | None = None
-    user_agent: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # Request/response schemas.
@@ -250,17 +232,8 @@ PEPPER = os.getenv("PASSWORD_PEPPER")
 ACCESS_MINUTES, REFRESH_DAYS = 15, 7
 COOKIE_NAME, COOKIE_PATH = "gymtrack_refresh", "/api/auth"
 hasher = PasswordHash.recommended()
-bearer = HTTPBearer(auto_error=False)
-
-
 def now():
     return datetime.now(timezone.utc)
-
-def session_dep():
-    with Session(engine) as session:
-        yield session
-
-DB = Annotated[Session, Depends(session_dep)]
 
 def peppered(value: str) -> str:
     return hmac.new((PEPPER or "local-only-pepper").encode(), value.encode(), hashlib.sha256).hexdigest()
@@ -290,57 +263,6 @@ def set_cookie(response: Response, value: str):
 def clear_cookie(response: Response):
     response.delete_cookie(COOKIE_NAME, path=COOKIE_PATH, httponly=True,
                            secure=os.getenv("VERCEL") == "1", samesite="lax")
-
-def client_ip(request: Request):
-    forwarded = request.headers.get("x-forwarded-for")
-    return (forwarded.split(",")[0].strip() if forwarded else
-            (request.client.host if request.client else ""))[:45] or None
-
-def audit(db: Session, request: Request, action: str, user: AppUser | None = None,
-          entity_type: str | None = None, entity_id=None, details: str | None = None, email: str | None = None):
-    try:
-        db.add(ActivityLog(user_id=user.id if user else None, email=user.email if user else email,
-                           action=action, entity_type=entity_type,
-                           entity_id=str(entity_id) if entity_id is not None else None,
-                           details=(details or "")[:500] or None, ip_address=client_ip(request),
-                           user_agent=(request.headers.get("user-agent") or "")[:250] or None))
-        db.commit()
-    except Exception:
-        db.rollback()
-
-def current_user(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)], db: DB):
-    if not credentials:
-        raise HTTPException(401, "Not authenticated")
-    try:
-        claims = jwt.decode(credentials.credentials, JWT_SECRET or "local-only-secret-change-before-deploy",
-                            algorithms=["HS256"], options={"require": ["sub", "exp"]})
-        user_id = int(claims["sub"])
-    except (jwt.PyJWTError, KeyError, ValueError, TypeError):
-        raise HTTPException(401, "Invalid or expired access token")
-    user = db.get(AppUser, user_id)
-    if not user:
-        raise HTTPException(401, "Account not found")
-    if user.is_banned:
-        raise HTTPException(403, "Account is banned")
-    return user
-
-CURRENT = Annotated[AppUser, Depends(current_user)]
-
-def admin_user(user: CURRENT):
-    if user.role != "admin":
-        raise HTTPException(403, "Administrator permission required")
-    return user
-
-ADMIN = Annotated[AppUser, Depends(admin_user)]
-
-
-def trainer_user(user: CURRENT):
-    if user.role != "trainer":
-        raise HTTPException(403, "Trainer permission required")
-    return user
-
-
-TRAINER = Annotated[AppUser, Depends(trainer_user)]
 
 def public_user(user: AppUser):
     return {"id": user.id, "full_name": user.full_name, "email": user.email, "role": user.role,
