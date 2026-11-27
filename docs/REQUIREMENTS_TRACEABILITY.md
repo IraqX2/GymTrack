@@ -22,7 +22,7 @@ The course brief requires normal user and admin roles. GymTrack adds trainer as 
 | Member ownership | Member dashboard, memberships, attendance, requests and workouts filtered to signed-in member |
 | Admin authorization | Shared FastAPI admin dependency |
 | Trainer promotion | Admin role selector; public signup always creates normal user |
-| Trainer profile | Promotion creates/reactivates a trainer record linked by normalized email |
+| Trainer profile | Promotion creates/reactivates a trainer record linked through `trainer.user_id`, with email fallback for older records |
 | Trainer dashboard | Shows only assignments linked to signed-in trainer's profile |
 | Trainer progress | Trainer can view and write progress only for their own assignments |
 | Gym records | Admin screens for member/trainer CRUD, memberships, attendance, workout plans and assignments |
@@ -54,7 +54,7 @@ The source now implements the main admin controls that were missing in the first
 The remaining work is primarily verification and broader quality coverage:
 
 - Run end-to-end tests against Vercel + Supabase for normal member, trainer and admin accounts.
-- Verify the migration on the actual hosted database and review database grants/RLS.
+- Verify the existing `trainer_progress` schema is present on the target database and review database grants/RLS.
 - Expand pytest coverage to login failures, refresh rotation, logout/revocation, member ownership and group create/edit/assign denial.
 - Check moderation/export flows using representative hosted records and confirm exported data respects the active filter choices.
 - Continue migrating older endpoint domains out of `backend/gymtrack_api.py` into separate routers, services and repositories.
