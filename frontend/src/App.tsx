@@ -772,7 +772,7 @@ function GroupsPage({user}:{user:GymUser}){
 function Administration({user}:{user:GymUser}){
   const [tab,setTab]=useState<"Users"|"Groups"|"Activity"|"Security"|"Content">("Users");
   const [users,setUsers]=useState<GymRow[]>([]),[logs,setLogs]=useState<GymRow[]>([]);
-  const [contentType,setContentType]=useState<"memberships"|"attendance"|"workout_plans"|"assignments"|"groups"|"workout_progress">("memberships");
+  const [contentType,setContentType]=useState<"memberships"|"attendance"|"workout_plans"|"assignments"|"groups"|"trainer_progress">("memberships");
   const [content,setContent]=useState<{items:{id:number;label:string;details:string;created_at:string}[];total:number}>({items:[],total:0});
   const [contentOffset,setContentOffset]=useState(0),[selectedContentIds,setSelectedContentIds]=useState<number[]>([]);
   const [userTotal,setUserTotal]=useState(0),[userOffset,setUserOffset]=useState(0);
@@ -855,7 +855,7 @@ function Administration({user}:{user:GymUser}){
     <div className="gt-tabbar">{(["Users","Groups","Activity","Security","Content"] as const).map(item=><button className={tab===item?"active":""} key={item} onClick={()=>setTab(item)}>{item}</button>)}</div>
     {error&&<div className="gt-alert error">{error}</div>}
     <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>{setQuery(e.target.value);setUserOffset(0);setContentOffset(0);}}/>}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
-      {tab==="Content"&&<label className="gt-field">Record type<select value={contentType} onChange={e=>{setContentType(e.target.value as typeof contentType);setContentOffset(0);setSelectedContentIds([]);}}><option value="memberships">Memberships</option><option value="attendance">Attendance</option><option value="workout_plans">Workout plans</option><option value="assignments">Workout assignments</option><option value="groups">Groups</option><option value="workout_progress">Trainer progress</option></select></label>}
+      {tab==="Content"&&<label className="gt-field">Record type<select value={contentType} onChange={e=>{setContentType(e.target.value as typeof contentType);setContentOffset(0);setSelectedContentIds([]);}}><option value="memberships">Memberships</option><option value="attendance">Attendance</option><option value="workout_plans">Workout plans</option><option value="assignments">Workout assignments</option><option value="groups">Groups</option><option value="trainer_progress">Trainer progress</option></select></label>}
       {tab==="Users"&&<div className="gt-panel-tools">
         <label className="gt-field">Role<select value={userRole} onChange={e=>{setUserRole(e.target.value);setUserOffset(0);}}><option value="">All roles</option><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></label>
         <label className="gt-field">Status<select value={userStatus} onChange={e=>{setUserStatus(e.target.value);setUserOffset(0);}}><option value="">All statuses</option><option value="active">Active</option><option value="banned">Banned</option></select></label>
