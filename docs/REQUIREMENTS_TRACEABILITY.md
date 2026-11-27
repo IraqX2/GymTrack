@@ -27,8 +27,11 @@ The course brief requires normal user and admin roles. GymTrack adds trainer as 
 | Trainer progress | Trainer can view and write progress only for their own assignments |
 | Gym records | Admin screens for member/trainer CRUD, memberships, attendance, workout plans and assignments |
 | Attendance requests | Member submits; admin approves/rejects |
-| Administration | Account search, role changes, ban/unban, session revocation, activity/security views and CSV exports |
+| Administration | Account search, role/status filters, paginated results, account detail, role changes, ban/unban, bulk ban/unban, session revocation, activity/security views and CSV exports |
 | Shared groups | Owner-managed membership and server-enforced create/edit/assign permissions |
+| Content moderation | Search and paginate supported record types; delete one/many memberships, attendance entries, workout plans, assignments, groups and trainer progress |
+| CSV exports | Filter-aware user/member/activity exports plus trainer, membership, attendance, plan, assignment and group exports; export events are audited |
+| Security summaries | Failed-login events summarized by IP address and account |
 | Database | Supabase PostgreSQL for deployment; local SQLite only for local development |
 | Frontend/backend separation | React calls FastAPI through the shared frontend API service |
 
@@ -46,16 +49,18 @@ Some older resource endpoints remain in `backend/gymtrack_api.py`; the remaining
 
 ## Important outstanding checks against the course brief
 
-The source does not yet prove every item in the final rubric. Before submission, check or complete:
+The source now implements the main admin controls that were missing in the first review: account search/filter/pagination, account detail, bulk ban/unban, supported content moderation and broader CSV exports. GitHub Actions currently runs backend authorization/security smoke tests and a frontend TypeScript/Vite production build.
 
-- Admin user filters for role/status and visible pagination.
-- User detail view with that user's records, groups, sessions and activity.
-- Bulk ban/unban.
-- Admin content moderation for listing/deleting records and groups.
-- CSV exports for every required record/group category and filter.
-- Automated pytest cases for login, invalid/expired tokens and at least three RBAC rules.
-- Hosted smoke tests for all roles, group permissions, denied requests, session rotation/revocation and persistence.
-- Review Supabase table grants and RLS before any real member information is stored.
+The remaining work is primarily verification and broader quality coverage:
+
+- Run end-to-end tests against Vercel + Supabase for normal member, trainer and admin accounts.
+- Verify the migration on the actual hosted database and review database grants/RLS.
+- Expand pytest coverage to login failures, refresh rotation, logout/revocation, member ownership and group create/edit/assign denial.
+- Check moderation/export flows using representative hosted records and confirm exported data respects the active filter choices.
+- Continue migrating older endpoint domains out of `backend/gymtrack_api.py` into separate routers, services and repositories.
+- Record the required screenshots and voice demo from the deployed application.
+
+The content-moderation page intentionally supports memberships, attendance, workout plans, assignments, groups and trainer progress. It is not a generic delete operation for every database table. Do not claim live behavior without completing the deployed checks.
 
 ## Deployment and student submission items
 
