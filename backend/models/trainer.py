@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
+
 from sqlmodel import Field, SQLModel
 
 
 class Trainer(SQLModel, table=True):
-    """Gym staff profile linked to a login account by its normalized email."""
+    """Gym staff profile linked to a login account."""
 
     __tablename__ = "trainer"
 
@@ -12,3 +14,5 @@ class Trainer(SQLModel, table=True):
     phone: str = Field(default="", max_length=30)
     specialization: str = Field(default="", max_length=100)
     is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
