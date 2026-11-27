@@ -1310,6 +1310,211 @@ def admin_security(user: ADMIN, db: DB):
     return {"failed_logins_24h": len(rows), "events": rows}
 
 
+def _admin_content_query(db: Session, content_type: str, q: str):
+    from sqlalchemy import func
+
+    if content_type == "memberships":
+        statement = select(Membership)
+        if q:
+            statement = statement.where(Membership.plan_name.ilike(f"%{q}%"))
+        total = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        rows = db.exec(statement.order_by(Membership.created_at.desc()).limit(10000)).all()
+        items = [
+            {"id": row.id, "label": row.plan_name, "details": f"Member #{row.member_id} · {row.status}",
+             "created_at": row.created_at}
+            for row in rows
+        ]
+    elif content_type == "attendance":
+        statement = select(Attendance)
+        if q and q.isdigit():
+            statement = statement.where(
+                (Attendance.member_id == int(q)) | (Attendance.id == int(q))
+            )
+        total = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        rows = db.exec(statement.order_by(Attendance.check_in.desc()).limit(10000)).all()
+        items = [
+            {"id": row.id, "label": f"Attendance #{row.id}",
+             "details": f"Member #{row.member_id} · {row.check_in} · "
+                        f"{'Checked out' if row.check_out else 'Currently checked in'}",
+             "created_at": row.check_in}
+            for row in rows
+        ]
+    elif content_type == "workout_plans":
+        statement = select(WorkoutPlan)
+        if q:
+            statement = statement.where(
+                WorkoutPlan.title.ilike(f"%{q}%") | WorkoutPlan.description.ilike(f"%{q}%")
+            )
+        total = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        rows = db.exec(statement.order_by(WorkoutPlan.created_at.desc()).limit(10000)).all()
+        items = [
+            {"id": row.id, "label": row.title,
+             "details": f"{row.level} · {row.duration_weeks} weeks", "created_at": row.created_at}
+            for row in rows
+        ]
+    elif content_type == "assignments":
+        statement = (
+            select(WorkoutAssignment, WorkoutPlan, Member)
+            .join(WorkoutPlan, WorkoutPlan.id == WorkoutAssignment.plan_id)
+            .join(Member, Member.id == WorkoutAssignment.member_id)
+        )
+        if q:
+            statement = statement.where(
+                WorkoutPlan.title.ilike(f"%{q}%")
+                | Member.full_name.ilike(f"%{q}%")
+                | Member.email.ilike(f"%{q}%")
+            )
+        total = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        rows = db.exec(
+            statement.order_by(WorkoutAssignment.created_at.desc()).limit(10000)
+        ).all()
+        items = [
+            {"id": assignment.id, "label": f"{plan.title} → {member.full_name}",
+             "details": f"{assignment.status} · Trainer #{assignment.trainer_id or 'unassigned'}",
+             "created_at": assignment.created_at}
+            for assignment, plan, member in rows
+        ]
+    elif content_type == "groups":
+        statement = select(GymGroup)
+        if q:
+            statement = statement.where(GymGroup.name.ilike(f"%{q}%"))
+        total = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        rows = db.exec(statement.order_by(GymGroup.created_at.desc()).limit(10000)).all()
+        items = [
+            {"id": row.id, "label": row.name,
+             "details": f"Owner account #{row.created_by}", "created_at": row.created_at}
+            for row in rows
+        ]
+    elif content_type == "workout_progress":
+        statement = select(WorkoutProgress)
+        if q:
+            statement = statement.where(WorkoutProgress.notes.ilike(f"%{q}%"))
+        total = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        rows = db.exec(
+            statement.order_by(WorkoutProgress.recorded_at.desc()).limit(10000)
+        ).all()
+        items = [
+            {"id": row.id, "label": f"Progress #{row.id}",
+             "details": f"Assignment #{row.assignment_id} · Trainer #{row.trainer_id} · {row.status}",
+             "created_at": row.recorded_at}
+            for row in rows
+        ]
+    else:
+        raise HTTPException(422, "Unsupported content type")
+    return items, total
+
+
+def _delete_admin_content_record(db: Session, content_type: str, record_id: int) -> None:
+    if content_type == "memberships":
+        row = db.get(Membership, record_id)
+        if row is None:
+            raise HTTPException(404, "Membership record not found")
+        db.delete(row)
+    elif content_type == "attendance":
+        row = db.get(Attendance, record_id)
+        if row is None:
+            raise HTTPException(404, "Attendance record not found")
+        db.delete(row)
+    elif content_type == "workout_progress":
+        row = db.get(WorkoutProgress, record_id)
+        if row is None:
+            raise HTTPException(404, "Progress record not found")
+        db.delete(row)
+    elif content_type == "assignments":
+        row = db.get(WorkoutAssignment, record_id)
+        if row is None:
+            raise HTTPException(404, "Workout assignment not found")
+        for progress in db.exec(
+            select(WorkoutProgress).where(WorkoutProgress.assignment_id == record_id)
+        ).all():
+            db.delete(progress)
+        db.delete(row)
+    elif content_type == "workout_plans":
+        row = db.get(WorkoutPlan, record_id)
+        if row is None:
+            raise HTTPException(404, "Workout plan not found")
+        assignments = db.exec(
+            select(WorkoutAssignment).where(WorkoutAssignment.plan_id == record_id)
+        ).all()
+        for assignment in assignments:
+            for progress in db.exec(
+                select(WorkoutProgress).where(WorkoutProgress.assignment_id == assignment.id)
+            ).all():
+                db.delete(progress)
+            db.delete(assignment)
+        db.delete(row)
+    elif content_type == "groups":
+        row = db.get(GymGroup, record_id)
+        if row is None:
+            raise HTTPException(404, "Group not found")
+        for task in db.exec(
+            select(GymGroupTask).where(GymGroupTask.group_id == record_id)
+        ).all():
+            db.delete(task)
+        for membership in db.exec(
+            select(GymGroupMember).where(GymGroupMember.group_id == record_id)
+        ).all():
+            db.delete(membership)
+        db.delete(row)
+    else:
+        raise HTTPException(422, "Unsupported content type")
+
+
+@app.get("/api/admin/content")
+def admin_content(
+    user: ADMIN,
+    db: DB,
+    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "workout_progress"] = Query("memberships", alias="type"),
+    q: str = "",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+):
+    items, total = _admin_content_query(db, content_type, q)
+    return {
+        "items": items[offset:offset + limit],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "type": content_type,
+    }
+
+
+@app.delete("/api/admin/content/{content_type}/{record_id}", status_code=204)
+def delete_admin_content(
+    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "workout_progress"],
+    record_id: int,
+    user: ADMIN,
+    db: DB,
+    request: Request,
+):
+    _delete_admin_content_record(db, content_type, record_id)
+    db.commit()
+    audit(db, request, "content_deleted", user, content_type, record_id)
+    return Response(status_code=204)
+
+
+@app.post("/api/admin/content/{content_type}/bulk-delete")
+def bulk_delete_admin_content(
+    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "workout_progress"],
+    data: BulkContentDelete,
+    user: ADMIN,
+    db: DB,
+    request: Request,
+):
+    record_ids = list(dict.fromkeys(data.ids))
+    try:
+        for record_id in record_ids:
+            _delete_admin_content_record(db, content_type, record_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    for record_id in record_ids:
+        audit(db, request, "content_deleted", user, content_type, record_id, "Bulk moderation")
+    return {"count": len(record_ids), "deleted_ids": record_ids}
+
+
 @app.get("/api/admin/export/users")
 def export_users(user: ADMIN, db: DB, q: str = "", role: str = "", status: str = ""):
     query = select(AppUser)
