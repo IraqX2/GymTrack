@@ -34,7 +34,6 @@ GymTrack/
 │   ├── repositories/ Database queries
 │   ├── services/  Domain/business rules
 │   ├── routers/   FastAPI route handlers
-│   └── migrations/ Hosted database migrations
 ├── docs/           Requirements, design and final report
 └── vercel.json
 ```
@@ -90,7 +89,7 @@ Set these server-side variables in Vercel for Preview and Production:
 | `BOOTSTRAP_ADMIN_EMAIL` | Account permitted to receive the initial administrator role |
 | `FRONTEND_URLS` | Allowed frontend origins if using a separate frontend origin |
 
-Apply the SQL files under `backend/migrations/` in the Supabase SQL Editor before using the feature that requires them. Never commit secrets or put them in frontend code. See [Final deployment setup](docs/FINAL_DEPLOYMENT_SETUP.md).
+The connected GymTrack Supabase project already contains `public.trainer_progress` from migration `20261127071138_gymtrack_trainer_access_and_private_tables`; this branch maps to that existing schema and does not require another progress-table migration. Apply future schema changes through reviewed migrations. Never commit secrets or put them in frontend code. See [Final deployment setup](docs/FINAL_DEPLOYMENT_SETUP.md).
 
 ## Main API routes
 

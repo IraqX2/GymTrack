@@ -16,5 +16,5 @@ class RoleChangeBody(BaseModel):
 
 
 class TrainerProgressCreate(BaseModel):
-    status: Literal["in_progress", "completed"] = "in_progress"
+    completion_percent: int = Field(default=0, ge=0, le=100)
     notes: str = Field(default="", max_length=600)

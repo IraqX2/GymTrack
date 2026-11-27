@@ -37,7 +37,7 @@ This document defines GymTrack's current functional and non-functional requireme
 | FR-09 | Admins can change account roles, ban/unban users and revoke sessions. |
 | FR-10 | Admins can promote a normal user account to trainer. |
 | FR-11 | Trainers can list only their own allocated members and workout assignments. |
-| FR-12 | Trainers can record progress only against assignments linked to their trainer ID. |
+| FR-12 | Trainers can record a completion percentage and notes only against assignments linked to their trainer ID. |
 | FR-13 | Members can submit attendance requests for admin review. |
 | FR-14 | Groups support create/edit/assign permissions checked by the backend. |
 | FR-15 | Admins can review activity/security information and export supported CSV reports. |

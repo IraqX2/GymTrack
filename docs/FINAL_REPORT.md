@@ -85,7 +85,7 @@ Online payment processing, biometric entry, nutrition plans, mobile applications
 | FR-10 | Manage memberships and attendance | Membership and attendance endpoints |
 | FR-11 | Review member attendance requests | Member request and admin review workflow |
 | FR-12 | Create and assign workouts | Workout plan and assignment endpoints |
-| FR-13 | Promote a member account to trainer | Admin role selector; trainer profile is linked by normalized email |
+| FR-13 | Promote a member account to trainer | Admin role selector; trainer profile is linked through `trainer.user_id` |
 | FR-14 | View trainer assignments | Trainer-only dashboard endpoint |
 | FR-15 | Record trainer progress | Assignment ownership checked before storing progress |
 | FR-16 | Manage shared groups | Owner-managed group membership |
@@ -128,11 +128,11 @@ Online payment processing, biometric entry, nutrition plans, mobile applications
 1. A visitor signs up using the normal signup form.
 2. The newly created account has the user role and a member profile.
 3. An administrator selects trainer for that account in Administration → Users.
-4. The backend creates or reactivates a trainer staff profile using the account's normalized email.
+4. The backend creates or reactivates a trainer staff profile using the account ID through `trainer.user_id`, with normalized email only as a compatibility fallback.
 5. An administrator assigns a workout plan to a member and selects the trainer profile.
 6. The trainer signs in and opens My Trainees.
 7. The dashboard lists only that trainer's assigned workout/member rows.
-8. The trainer can add an in_progress or completed update with notes.
+8. The trainer can add a completion percentage from 0 to 100 with notes.
 9. An attempt to read or update another trainer's assignment is rejected by the backend.
 
 ---
@@ -188,11 +188,11 @@ Primary tables used by the application include:
 - attendance_request: member-submitted requests awaiting admin review.
 - workout_plan: workout plan definitions.
 - workout_assignment: relation from a member and plan to an optional trainer.
-- workout_progress: trainer progress entries tied to an assignment and trainer.
+- trainer_progress: trainer progress entries tied to an assignment, member and trainer, with a completion percentage, notes, date and creation timestamp.
 - gym_group, gym_group_member, gym_group_task: shared groups and permissions.
 - activity_log: audit history.
 
-The new trainer progress table is defined by backend/migrations/2026_11_27_trainer_progress.sql. It must be applied in Supabase before deploying/using the trainer progress endpoint because the Vercel startup path intentionally does not auto-create hosted tables.
+The hosted GymTrack database already has `public.trainer_progress`, created by the existing migration `20261127071138_gymtrack_trainer_access_and_private_tables`. The application maps to that existing table; no duplicate progress table or additional production migration is required.
 
 ## 13. Authentication and authorization flow
 
@@ -242,7 +242,7 @@ The trainer service resolves the trainer profile and filters workout assignments
 
 ## 16. Validation and error handling
 
-The trainer schemas restrict role values to user, trainer or admin, limit text sizes and restrict progress status to in_progress or completed. The service layer rejects missing or unrelated assignment IDs with 404. Non-trainer accounts are rejected by the trainer dependency with 403.
+The trainer schemas restrict role values to user, trainer or admin, limit text sizes and validate progress completion percentage to the 0–100 range. The service layer rejects missing or unrelated assignment IDs with 404. Non-trainer accounts are rejected by the trainer dependency with 403.
 
 ## 17. Deployment configuration
 
@@ -254,7 +254,7 @@ The Vercel backend requires server-side environment variables:
 - BOOTSTRAP_ADMIN_EMAIL: account permitted to receive initial admin status.
 - FRONTEND_URLS: allowed origins when frontend and API origins differ.
 
-Apply the migration SQL in Supabase first, verify the hosted database connection, and then deploy the feature branch to a preview environment. Production credentials must never be committed to Git.
+The hosted Supabase project already contains the `trainer_progress` table from migration `20261127071138_gymtrack_trainer_access_and_private_tables`; no additional progress-table migration is required. A read-only schema inspection on 27 November 2026 confirmed the table columns and that its RLS flag is enabled. The inspected trainer, progress, workout-assignment and group-membership tables had no table-specific policies; the browser does not connect directly to the database, and FastAPI performs the authorization checks. Review the server database role and policies before using real member data. Production credentials must never be committed to Git.
 
 ---
 

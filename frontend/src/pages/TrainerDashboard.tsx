@@ -18,11 +18,11 @@ type TrainerDashboardData = {
 };
 
 type ProgressDraft = {
-  status: "in_progress" | "completed";
+  completion_percent: number;
   notes: string;
 };
 
-const emptyDraft: ProgressDraft = { status: "in_progress", notes: "" };
+const emptyDraft: ProgressDraft = { completion_percent: 0, notes: "" };
 
 export default function TrainerDashboard() {
   const [data, setData] = useState<TrainerDashboardData | null>(null);
@@ -66,7 +66,7 @@ export default function TrainerDashboard() {
       await api(
         `/api/trainer/assignments/${assignmentId}/progress`,
         "POST",
-        { status: draft.status, notes: draft.notes.trim() },
+        { completion_percent: draft.completion_percent, notes: draft.notes.trim() },
       );
       setDrafts(current => ({ ...current, [assignmentId]: emptyDraft }));
       setMessage("Progress update saved.");
@@ -166,8 +166,8 @@ export default function TrainerDashboard() {
                         {progress.map(entry => (
                           <div className="gt-session-row" key={entry.id}>
                             <div>
-                              <strong>{entry.status.replace("_", " ")}</strong>
-                              <small>{new Date(entry.recorded_at).toLocaleString()}</small>
+                              <strong>{entry.completion_percent}% complete</strong>
+                              <small>{new Date(entry.progress_date).toLocaleDateString()} · {new Date(entry.created_at).toLocaleTimeString()}</small>
                               {entry.notes && <small>{entry.notes}</small>}
                             </div>
                           </div>
@@ -180,14 +180,17 @@ export default function TrainerDashboard() {
                     <form className="gt-invite-form" onSubmit={event => void submitProgress(event, assignment.id)}>
                       <h4>Record a progress update</h4>
                       <label className="gt-field">
-                        Status
-                        <select
-                          value={draft.status}
-                          onChange={event => updateDraft(assignment.id, { status: event.target.value as ProgressDraft["status"] })}
-                        >
-                          <option value="in_progress">In progress</option>
-                          <option value="completed">Completed</option>
-                        </select>
+                        Completion percentage
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={draft.completion_percent}
+                          onChange={event => updateDraft(assignment.id, {
+                            completion_percent: Math.min(100, Math.max(0, Number(event.target.value) || 0)),
+                          })}
+                        />
                       </label>
                       <label className="gt-field">
                         Trainer notes
