@@ -1,127 +1,69 @@
-# Software Requirements Specification (SRS)
+# GymTrack Software Requirements Specification (SRS)
 
-## GymTrack
-
-- **Course:** CSE309
-- **Version:** 1.1
-- **Status:** Draft
-- **Updated:** 13 October 2026
+**Course:** CSE309 · Autumn 2026  
+**Version:** 2.0 · **Status:** Final implementation scope  
+**Detailed report:** [FINAL_REPORT.md](FINAL_REPORT.md)
 
 ## 1. Purpose
 
-This document lists what GymTrack should do and the basic conditions it should meet. It is meant to guide development and help check the features during testing.
+This document defines GymTrack's current functional and non-functional requirements. The consolidated project report contains the full role matrix, design and verification checklist.
 
-## 2. Current state and scope
+## 2. Technology
 
-The current starter contains a React dashboard and a FastAPI backend with three simple endpoints. The main gym features described below are planned work. They should not be considered implemented until they are added and tested.
+- Frontend: React, TypeScript and Vite.
+- Backend: Python and FastAPI.
+- Persistence: SQLModel; SQLite locally and Supabase PostgreSQL in deployment.
+- Authentication: Argon2 password hashes, signed JWT access token and rotating HttpOnly refresh session.
+- Hosting: Vercel.
 
-The frontend uses React, TypeScript, and Vite. The backend uses Python and FastAPI. The first version is intended to run locally.
+## 3. Account types
 
-## 3. User types
-
-- **Administrator:** manages gym records.
-- **Trainer:** works with assigned workout plans. Role restrictions are planned for Beta.
-- **Member:** views their own membership, attendance, and workout information after login is added.
+- User/member: normal public signup, personal gym portal.
+- Trainer: admin-promoted user with access to assignments linked to their trainer profile.
+- Admin: account and gym management.
 
 ## 4. Functional requirements
 
-### General
-
-| ID | Requirement | Version |
-|---|---|---|
-| FR-01 | The app shall provide pages for the main GymTrack modules. | MVP |
-| FR-02 | The frontend shall send requests to the backend through the REST API. | MVP |
-| FR-03 | The backend shall check submitted data and return an error for invalid requests. | MVP |
-| FR-04 | The app shall save records in a database so they remain after a restart. | MVP |
-| FR-05 | The API shall provide a health endpoint. | Starter exists |
-
-### Members and trainers
-
-| ID | Requirement | Version |
-|---|---|---|
-| FR-10 | An administrator shall be able to add a member. | MVP |
-| FR-11 | The app shall list and show member details. | MVP |
-| FR-12 | An administrator shall be able to edit or remove a member. | MVP |
-| FR-13 | An administrator shall be able to add, list, edit, and remove trainers. | MVP |
-
-### Membership and attendance
-
-| ID | Requirement | Version |
-|---|---|---|
-| FR-20 | The app shall store a member's plan and membership dates. | MVP |
-| FR-21 | The app shall show the membership status. | MVP |
-| FR-22 | An administrator shall be able to record a check-in for a member. | MVP |
-| FR-23 | The app shall show attendance history for a selected member. | MVP |
-
-### Workout plans
-
-| ID | Requirement | Version |
-|---|---|---|
-| FR-30 | An administrator shall be able to create, view, edit, and remove workout plans. | MVP |
-| FR-31 | A workout plan shall be assignable to a member and, when needed, a trainer. | MVP |
-| FR-32 | The app shall keep a basic progress history. | Beta |
-
-### Login and permissions
-
-| ID | Requirement | Version |
-|---|---|---|
-| FR-40 | A registered user shall be able to sign in. | Beta |
-| FR-41 | The system shall distinguish administrator, trainer, and member roles. | Beta |
-| FR-42 | The backend shall check permissions for protected actions. | Beta |
-| FR-43 | A member shall only be able to view their own private records. | Beta |
+| ID | Requirement |
+|---|---|
+| FR-01 | A visitor can sign up and log in. |
+| FR-02 | Passwords are hashed using Argon2 with a server-side pepper. |
+| FR-03 | The API signs and verifies short-lived JWT access tokens. |
+| FR-04 | Refresh tokens are HttpOnly, rotated and revocable. |
+| FR-05 | Users can update their profile, change password and list/revoke sessions. |
+| FR-06 | The backend enforces role and account-ban checks on protected requests. |
+| FR-07 | A member can access only their own membership, attendance, requests and workouts. |
+| FR-08 | Admins can manage members, trainers, memberships, attendance, plans and assignments. |
+| FR-09 | Admins can change account roles, ban/unban users and revoke sessions. |
+| FR-10 | Admins can promote a normal user account to trainer. |
+| FR-11 | Trainers can list only their own allocated members and workout assignments. |
+| FR-12 | Trainers can record progress only against assignments linked to their trainer ID. |
+| FR-13 | Members can submit attendance requests for admin review. |
+| FR-14 | Groups support create/edit/assign permissions checked by the backend. |
+| FR-15 | Admins can review activity/security information and export supported CSV reports. |
+| FR-16 | Production records are stored in hosted PostgreSQL. |
 
 ## 5. Non-functional requirements
 
-| ID | Requirement |
-|---|---|
-| NFR-01 | Frontend and backend code shall stay in separate folders. |
-| NFR-02 | The main pages should be usable on common desktop and mobile screen sizes. |
-| NFR-03 | Invalid input shall not be saved as a valid record. |
-| NFR-04 | Error messages should help the user understand what went wrong without showing private system details. |
-| NFR-05 | Passwords shall not be stored as plain text when login is implemented. |
-| NFR-06 | Secret keys and local environment files shall not be committed to GitHub. |
-| NFR-07 | The main workflows shall have repeatable test steps. |
+- Keep secrets out of frontend source control and public README.
+- Validate request data and provide consistent HTTP errors.
+- Never rely on hidden buttons as the only security check.
+- Do not persist production data on temporary Vercel filesystem storage.
+- Provide loading, empty and error states on primary screens.
+- Test role denial, ownership, refresh/revocation and persistence on the live deployment.
 
-## 6. Interfaces
+## 6. Acceptance tests
 
-- **Frontend:** browser-based React application.
-- **Backend:** FastAPI REST endpoints returning JSON.
-- **Local development:** Vite usually runs on port 5173; FastAPI runs on port 8000.
-- **Database:** SQLite is the current proposal for the first version.
+- Signup always creates a normal user and member profile.
+- Admin promotion links or creates the trainer profile.
+- A trainer sees only assignments associated with their trainer profile.
+- A trainer cannot read or write another trainer's assignment.
+- A normal user cannot call trainer-only or admin-only endpoints.
+- A user cannot read another member's private records.
+- Group permission checks reject ungranted operations.
+- Logout/revocation prevents refresh-token reuse.
+- Hosted records remain after redeployment/restart.
 
-The starter endpoints are:
+## 7. Known verification gaps
 
-- `GET /api/health`
-- `GET /api/hello?name=YourName`
-- `GET /api/modules`
-
-The member, trainer, membership, attendance, and workout-plan endpoints still need to be implemented.
-
-## 7. Data to store
-
-The planned database will include:
-
-- **Member:** ID, name, contact details, join date, and active status.
-- **Trainer:** ID, name, contact details, and specialization.
-- **Membership:** ID, member ID, plan name, start date, end date, and status.
-- **Attendance:** ID, member ID, and check-in time.
-- **Workout plan:** ID, title, description, and assigned member/trainer.
-- **Progress entry (Beta):** ID, member ID, date, and progress notes.
-
-Records should have unique IDs. A membership or attendance record should not refer to a member who does not exist.
-
-## 8. Acceptance checks
-
-- **AT-01:** A member can be added and then retrieved.
-- **AT-02:** Editing a member changes the stored details.
-- **AT-03:** Removing a member removes it from later results.
-- **AT-04:** Invalid required fields are rejected.
-- **AT-05:** A membership can be linked to an existing member.
-- **AT-06:** An attendance record can be saved and viewed in the member's history.
-- **AT-07:** A workout plan can be created and assigned.
-- **AT-08:** The frontend can reach the backend through the local Vite proxy.
-- **AT-09 (Beta):** A user cannot access data or actions outside their role.
-
-## 9. Limitations
-
-The starter does not yet have database storage, full CRUD features, login, role permissions, or deployment. The requirements above describe the intended work for the project.
+The admin UI still needs rubric-level role/status filters and visible pagination, user detail view, bulk ban/unban and full content moderation. Exports for all rubric resource categories and automated pytest coverage also need completion. Live deployment checks and the report screenshots/video must be supplied before final submission. See [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md).
