@@ -775,6 +775,7 @@ function Administration({user}:{user:GymUser}){
   const [userTotal,setUserTotal]=useState(0),[userOffset,setUserOffset]=useState(0);
   const [userRole,setUserRole]=useState(""),[userStatus,setUserStatus]=useState("");
   const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[]}>({failed_logins_24h:0,events:[]});
+  const [detail,setDetail]=useState<any>(null),[detailLoading,setDetailLoading]=useState(false);
   const [query,setQuery]=useState(""),[error,setError]=useState("");
   const pageSize=20;
   const load=useCallback(async()=>{
@@ -790,6 +791,12 @@ function Administration({user}:{user:GymUser}){
     }catch(e){setError(e instanceof Error?e.message:"Could not load admin information");}
   },[tab,query,userRole,userStatus,userOffset]);
   useEffect(()=>{void load();},[load]);
+  async function showDetail(row:GymRow){
+    setDetailLoading(true);setDetail(null);setError("");
+    try{setDetail(await api<any>("/api/admin/users/"+row.id));}
+    catch(e){setError(e instanceof Error?e.message:"Could not load user detail");}
+    finally{setDetailLoading(false);}
+  }
   async function changeRole(row:GymRow,next:"user"|"trainer"|"admin"){if(next===row.role)return;if(row.id===user.id)return;if(!window.confirm("Change "+row.email+" to "+next+"?"))return;try{await api("/api/admin/users/"+row.id+"/role","PATCH",{role:next});await load();}catch(e){setError(e instanceof Error?e.message:"Could not change role");}}
   async function ban(row:GymRow){if(row.is_banned){try{await api("/api/admin/users/"+row.id+"/unban","POST");await load();}catch(e){setError(e instanceof Error?e.message:"Could not unban user");}return;}const reason=window.prompt("Ban reason:");if(reason===null)return;try{await api("/api/admin/users/"+row.id+"/ban","POST",{reason});await load();}catch(e){setError(e instanceof Error?e.message:"Could not ban user");}}
   async function revoke(row:GymRow){if(!window.confirm("Revoke all sessions for "+row.email+"?"))return;try{await api("/api/admin/users/"+row.id+"/revoke-sessions","POST");}catch(e){setError(e instanceof Error?e.message:"Could not revoke sessions");}}
@@ -802,7 +809,24 @@ function Administration({user}:{user:GymUser}){
         <label className="gt-field">Status<select value={userStatus} onChange={e=>{setUserStatus(e.target.value);setUserOffset(0);}}><option value="">All statuses</option><option value="active">Active</option><option value="banned">Banned</option></select></label>
       </div>}
       {tab==="Groups"&&<GroupsPage user={user}/>}
-      {tab==="Users"&&<><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td><select aria-label={"Role for "+row.email} value={row.role} disabled={row.id===user.id} onChange={event=>void changeRole(row,event.target.value as "user"|"trainer"|"admin")}><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>
+      {tab==="Users"&&detailLoading&&<section className="gt-panel"><p className="gt-empty">Loading account detail…</p></section>}
+      {tab==="Users"&&detail&&!detailLoading&&<section className="gt-panel">
+        <div className="gt-panel-head"><div><p className="gt-eyebrow">ACCOUNT DETAIL</p><h3>{detail.user.full_name}</h3><p className="gt-muted">{detail.user.email} · {detail.user.role} · {detail.user.is_banned?"Banned":"Active"}</p></div><button className="gt-secondary" onClick={()=>setDetail(null)}>Close</button></div>
+        <div className="gt-stat-grid">
+          <article className="gt-stat"><span>Membership records</span><strong>{detail.memberships.length}</strong></article>
+          <article className="gt-stat"><span>Attendance visits</span><strong>{detail.attendance.length}</strong></article>
+          <article className="gt-stat"><span>Workout assignments</span><strong>{detail.workouts.length}</strong></article>
+          <article className="gt-stat"><span>Groups</span><strong>{detail.groups.length}</strong></article>
+        </div>
+        {detail.member&&<><h4>Member profile</h4><p>{detail.member.full_name} · {detail.member.email} · {detail.member.phone||"No phone"} · {detail.member.is_active?"Active":"Inactive"}</p></>}
+        {detail.trainer&&<><h4>Trainer profile</h4><p>{detail.trainer.full_name} · {detail.trainer.specialization} · {detail.trainer.is_active?"Active":"Inactive"}</p></>}
+        <h4>Memberships</h4>{detail.memberships.length?detail.memberships.map((row:GymRow)=><div className="gt-simple-row" key={row.id}><strong>{row.plan_name}</strong><span>{row.start_date} to {row.end_date} · {row.status}</span></div>):<p className="gt-empty">No membership records.</p>}
+        <h4>Workouts</h4>{detail.workouts.length?detail.workouts.map((row:any)=><div className="gt-simple-row" key={row.assignment.id}><strong>{row.plan.title}</strong><span>{row.assignment.status} · Trainer ID: {row.assignment.trainer_id??"Unassigned"}</span></div>):<p className="gt-empty">No workout assignments.</p>}
+        <h4>Groups and permissions</h4>{detail.groups.length?detail.groups.map((row:any)=><div className="gt-simple-row" key={row.group.id}><strong>{row.group.name}</strong><span>{row.membership.role} · create {row.membership.can_create?"yes":"no"} · edit {row.membership.can_edit?"yes":"no"} · assign {row.membership.can_assign?"yes":"no"}</span></div>):<p className="gt-empty">No group memberships.</p>}
+        <h4>Sessions</h4>{detail.sessions.length?detail.sessions.map((row:any)=><div className="gt-session-row" key={row.id}><div><strong>{row.is_active?"Active":"Revoked/expired"}</strong><small>{row.user_agent||"Browser unavailable"} · {row.ip_address||"IP unavailable"}</small><small>Last used {new Date(row.last_used_at).toLocaleString()}</small></div></div>):<p className="gt-empty">No sessions.</p>}
+        <h4>Recent activity</h4>{detail.recent_activity.length?detail.recent_activity.map((row:GymRow)=><div className="gt-simple-row" key={row.id}><strong>{row.action}</strong><span>{new Date(row.created_at).toLocaleString()} · {row.ip_address||"IP unavailable"}</span></div>):<p className="gt-empty">No audit events recorded.</p>}
+      </section>}
+      {tab==="Users"&&<><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td><select aria-label={"Role for "+row.email} value={row.role} disabled={row.id===user.id} onChange={event=>void changeRole(row,event.target.value as "user"|"trainer"|"admin")}><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button onClick={()=>void showDetail(row)}>Details</button><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>
         <div className="gt-panel-head"><span className="gt-muted">{userTotal===0?"No users found":`Showing ${userOffset+1}–${Math.min(userOffset+users.length,userTotal)} of ${userTotal}`}</span><div className="gt-panel-tools"><button className="gt-secondary" disabled={userOffset===0} onClick={()=>setUserOffset(Math.max(0,userOffset-pageSize))}>Previous</button><button className="gt-secondary" disabled={userOffset+pageSize>=userTotal} onClick={()=>setUserOffset(userOffset+pageSize)}>Next</button></div></div>
       </>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
