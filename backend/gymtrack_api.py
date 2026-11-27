@@ -1099,6 +1099,96 @@ def admin_users(user: ADMIN, db: DB, q: str = "", role: str = "", status: str = 
     }
 
 
+@app.get("/api/admin/users/{target_id}")
+def admin_user_detail(target_id: int, user: ADMIN, db: DB):
+    target = db.get(AppUser, target_id)
+    if target is None:
+        raise HTTPException(404, "User not found")
+
+    member = db.exec(select(Member).where(Member.user_id == target_id)).first()
+    trainer = db.exec(select(Trainer).where(Trainer.email == target.email)).first()
+
+    memberships = []
+    attendance = []
+    workouts = []
+    if member is not None:
+        memberships = db.exec(
+            select(Membership)
+            .where(Membership.member_id == member.id)
+            .order_by(Membership.created_at.desc())
+        ).all()
+        attendance = db.exec(
+            select(Attendance)
+            .where(Attendance.member_id == member.id)
+            .order_by(Attendance.check_in.desc())
+            .limit(100)
+        ).all()
+        assignment_rows = db.exec(
+            select(WorkoutAssignment, WorkoutPlan)
+            .join(WorkoutPlan, WorkoutPlan.id == WorkoutAssignment.plan_id)
+            .where(WorkoutAssignment.member_id == member.id)
+            .order_by(WorkoutAssignment.created_at.desc())
+        ).all()
+        workouts = [
+            {"assignment": assignment, "plan": plan}
+            for assignment, plan in assignment_rows
+        ]
+
+    group_rows = db.exec(
+        select(GymGroupMember, GymGroup)
+        .join(GymGroup, GymGroup.id == GymGroupMember.group_id)
+        .where(GymGroupMember.user_id == target_id)
+    ).all()
+    session_rows = db.exec(
+        select(AuthSession)
+        .where(AuthSession.user_id == target_id)
+        .order_by(AuthSession.last_used_at.desc())
+        .limit(50)
+    ).all()
+    activity_rows = db.exec(
+        select(ActivityLog)
+        .where(ActivityLog.user_id == target_id)
+        .order_by(ActivityLog.created_at.desc())
+        .limit(50)
+    ).all()
+
+    return {
+        "user": public_user(target),
+        "member": member,
+        "trainer": trainer,
+        "memberships": memberships,
+        "attendance": attendance,
+        "workouts": workouts,
+        "groups": [
+            {
+                "group": group,
+                "membership": {
+                    "role": membership.role,
+                    "can_create": membership.can_create,
+                    "can_edit": membership.can_edit,
+                    "can_assign": membership.can_assign,
+                    "joined_at": membership.joined_at,
+                },
+            }
+            for membership, group in group_rows
+        ],
+        "sessions": [
+            {
+                "id": session.id,
+                "created_at": session.created_at,
+                "last_used_at": session.last_used_at,
+                "expires_at": session.expires_at,
+                "revoked_at": session.revoked_at,
+                "ip_address": session.ip_address,
+                "user_agent": session.user_agent,
+                "is_active": session.revoked_at is None and session.expires_at > now(),
+            }
+            for session in session_rows
+        ],
+        "recent_activity": activity_rows,
+    }
+
+
 @app.patch("/api/admin/users/{target_id}/role")
 def change_role(target_id: int, data: RoleChangeBody, user: ADMIN, db: DB, request: Request):
     if target_id == user.id:
