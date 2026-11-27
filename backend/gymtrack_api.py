@@ -1415,8 +1415,8 @@ def _admin_content_query(db: Session, content_type: str, q: str):
         ).all()
         items = [
             {"id": row.id, "label": f"Progress #{row.id}",
-             "details": f"Assignment #{row.assignment_id} · Trainer #{row.trainer_id} · {row.status}",
-             "created_at": row.recorded_at}
+             "details": f"Assignment #{row.assignment_id} · Member #{row.member_id} · Trainer #{row.trainer_id} · {row.completion_percent}% complete",
+             "created_at": row.created_at}
             for row in rows
         ]
     else:
