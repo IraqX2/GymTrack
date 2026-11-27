@@ -39,7 +39,7 @@ The course brief requires normal user and admin roles. GymTrack adds trainer as 
 
 A trainer is not an administrator. A trainer cannot manage accounts, membership plans, global workout plans or gym staff. They see only member details included in assignments allocated to their trainer profile. The backend checks assignment ownership again before returning or saving progress.
 
-The trainer profile is linked to an account by normalized email. When an administrator demotes a trainer, the profile is marked inactive and the account returns to the user role. Historical assignments are preserved.
+The trainer profile is linked to a login account through the existing `trainer.user_id` foreign key, with normalized email used only as a compatibility fallback for older staff records. When an administrator demotes a trainer, the profile is marked inactive and the account returns to the user role. Historical assignments are preserved.
 
 ## Architecture
 
@@ -64,7 +64,7 @@ The content-moderation page intentionally supports memberships, attendance, work
 
 ## Deployment and student submission items
 
-Apply `backend/migrations/2026_11_27_trainer_progress.sql` in Supabase before using trainer progress. Configure Vercel environment variables separately; keep secrets private.
+The existing Supabase project already has `public.trainer_progress` from migration `20261127071138_gymtrack_trainer_access_and_private_tables`; the code is aligned to its completion-percent/date columns. No extra production migration is required. Configure Vercel environment variables separately; keep secrets private.
 
 A report PDF with real screenshots and a 5–8 minute voice demo must be prepared from the deployed app. Required screenshots: member view, admin dashboard, RBAC denial, expired-token handling and activity log. Do not present build success as proof of live workflow tests.
 
