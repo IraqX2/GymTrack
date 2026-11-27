@@ -25,7 +25,7 @@ const modules: Record<string, Module> = {
       { key: "specialization", label: "Specialization" },
       { key: "is_active", label: "Active trainer", type: "checkbox" },
     ],
-    columns: ["full_name", "email", "phone", "specialization", "is_active"],
+    columns: ["full_name", "email", "user_id", "phone", "specialization", "is_active"],
   },
   "Workout Plans": {
     title: "Workout Plans", path: "/api/workout-plans", create: true, edit: true, remove: true, adminOnly: true,
@@ -119,7 +119,7 @@ type MemberDashboardData = {
   memberships: GymRow[];
   attendance: GymRow[];
   attendance_requests: GymRow[];
-  workouts: { assignment: GymRow; plan: GymRow; trainer: GymRow | null }[];
+  workouts: { assignment: GymRow; plan: GymRow; trainer: GymRow | null; progress?: GymRow[] }[];
 };
 
 function MemberPortalPage({ section, user }: { section: "Overview" | "My Membership" | "My Attendance" | "My Workouts"; user: GymUser }) {
@@ -214,6 +214,7 @@ function MemberPortalPage({ section, user }: { section: "Overview" | "My Members
               <div className="gt-panel-head"><div><h3>{row.plan.title}</h3><p className="gt-muted">{row.plan.level} · {row.plan.duration_weeks} weeks</p></div><span className={row.assignment.status === "active" ? "gt-status active" : "gt-status"}>{row.assignment.status}</span></div>
               <p className="gt-muted">{row.plan.description || "No additional instructions provided."}</p>
               <div className="gt-workout-meta"><span>Started: {row.assignment.start_date}</span><span>Trainer: {row.trainer?.full_name || "Not assigned"}</span></div>
+              {row.progress?.length ? <div className="gt-workout-progress"><h4>Trainer feedback</h4>{row.progress.slice(0, 3).map(progress => <div className="gt-simple-row" key={progress.id}><strong>{progress.completion_percent}% complete</strong><span>{progress.progress_date} · {progress.notes || "No note"}</span></div>)}</div> : null}
             </article>
           )}</div> : <div className="gt-empty-state"><strong>No workout plan assigned</strong><p>Your trainer or gym administrator can assign a workout plan to your member profile.</p></div>}
         </section>}
@@ -899,7 +900,7 @@ function TrainerAssignmentCard({ item, onRefresh }: { item: TrainerAssignment; o
       <div><p className="gt-eyebrow">WORKOUT #{item.assignment.id}</p><h3>{item.plan.title}</h3><p className="gt-muted">{item.plan.level} · {item.plan.duration_weeks} weeks</p></div>
       <label className="gt-field">Status
         <select value={item.assignment.status} onChange={e => void changeStatus(e.target.value)}>
-          <option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option>
+          <option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
         </select>
       </label>
     </div>
