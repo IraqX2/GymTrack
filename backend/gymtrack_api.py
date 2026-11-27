@@ -1307,7 +1307,27 @@ def admin_security(user: ADMIN, db: DB):
     rows = db.exec(select(ActivityLog).where(ActivityLog.created_at >= start,
         ActivityLog.action.in_(["login_failed", "login_locked", "login_blocked"]))
         .order_by(ActivityLog.created_at.desc()).limit(200)).all()
-    return {"failed_logins_24h": len(rows), "events": rows}
+
+    by_ip: dict[str, int] = {}
+    by_account: dict[str, int] = {}
+    for event in rows:
+        ip = event.ip_address or "Unknown IP"
+        account = event.email or "Unknown account"
+        by_ip[ip] = by_ip.get(ip, 0) + 1
+        by_account[account] = by_account.get(account, 0) + 1
+
+    return {
+        "failed_logins_24h": len(rows),
+        "events": rows,
+        "by_ip": [
+            {"ip_address": ip, "count": count}
+            for ip, count in sorted(by_ip.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "by_account": [
+            {"email": email, "count": count}
+            for email, count in sorted(by_account.items(), key=lambda item: item[1], reverse=True)
+        ],
+    }
 
 
 def _admin_content_query(db: Session, content_type: str, q: str):
