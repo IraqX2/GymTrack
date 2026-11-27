@@ -772,9 +772,23 @@ function GroupsPage({user}:{user:GymUser}){
 function Administration({user}:{user:GymUser}){
   const [tab,setTab]=useState<"Users"|"Groups"|"Activity"|"Security">("Users");
   const [users,setUsers]=useState<GymRow[]>([]),[logs,setLogs]=useState<GymRow[]>([]);
+  const [userTotal,setUserTotal]=useState(0),[userOffset,setUserOffset]=useState(0);
+  const [userRole,setUserRole]=useState(""),[userStatus,setUserStatus]=useState("");
   const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[]}>({failed_logins_24h:0,events:[]});
   const [query,setQuery]=useState(""),[error,setError]=useState("");
-  const load=useCallback(async()=>{try{if(tab==="Users")setUsers(await api<GymRow[]>("/api/admin/users?q="+encodeURIComponent(query)));if(tab==="Activity")setLogs(await api<GymRow[]>("/api/admin/activity?q="+encodeURIComponent(query)));if(tab==="Security")setSecurity(await api("/api/admin/security"));setError("");}catch(e){setError(e instanceof Error?e.message:"Could not load admin information");}},[tab,query]);
+  const pageSize=20;
+  const load=useCallback(async()=>{
+    try{
+      if(tab==="Users"){
+        const params=new URLSearchParams({q:query,role:userRole,status:userStatus,offset:String(userOffset),limit:String(pageSize)});
+        const result=await api<{items:GymRow[];total:number;offset:number;limit:number}>("/api/admin/users?"+params.toString());
+        setUsers(result.items);setUserTotal(result.total);
+      }
+      if(tab==="Activity")setLogs(await api<GymRow[]>("/api/admin/activity?q="+encodeURIComponent(query)));
+      if(tab==="Security")setSecurity(await api("/api/admin/security"));
+      setError("");
+    }catch(e){setError(e instanceof Error?e.message:"Could not load admin information");}
+  },[tab,query,userRole,userStatus,userOffset]);
   useEffect(()=>{void load();},[load]);
   async function changeRole(row:GymRow,next:"user"|"trainer"|"admin"){if(next===row.role)return;if(row.id===user.id)return;if(!window.confirm("Change "+row.email+" to "+next+"?"))return;try{await api("/api/admin/users/"+row.id+"/role","PATCH",{role:next});await load();}catch(e){setError(e instanceof Error?e.message:"Could not change role");}}
   async function ban(row:GymRow){if(row.is_banned){try{await api("/api/admin/users/"+row.id+"/unban","POST");await load();}catch(e){setError(e instanceof Error?e.message:"Could not unban user");}return;}const reason=window.prompt("Ban reason:");if(reason===null)return;try{await api("/api/admin/users/"+row.id+"/ban","POST",{reason});await load();}catch(e){setError(e instanceof Error?e.message:"Could not ban user");}}
@@ -782,9 +796,15 @@ function Administration({user}:{user:GymUser}){
   return <div className="gt-page-stack"><section className="gt-section-title"><div><p className="gt-eyebrow">SYSTEM CONTROL</p><h2>Administration</h2><p className="gt-muted">Manage accounts, review activity and monitor security.</p></div></section>
     <div className="gt-tabbar">{(["Users","Groups","Activity","Security"] as const).map(item=><button className={tab===item?"active":""} key={item} onClick={()=>setTab(item)}>{item}</button>)}</div>
     {error&&<div className="gt-alert error">{error}</div>}
-    <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/>}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
+    <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>{setQuery(e.target.value);setUserOffset(0);}}/>}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
+      {tab==="Users"&&<div className="gt-panel-tools">
+        <label className="gt-field">Role<select value={userRole} onChange={e=>{setUserRole(e.target.value);setUserOffset(0);}}><option value="">All roles</option><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></label>
+        <label className="gt-field">Status<select value={userStatus} onChange={e=>{setUserStatus(e.target.value);setUserOffset(0);}}><option value="">All statuses</option><option value="active">Active</option><option value="banned">Banned</option></select></label>
+      </div>}
       {tab==="Groups"&&<GroupsPage user={user}/>}
-      {tab==="Users"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td><select aria-label={"Role for "+row.email} value={row.role} disabled={row.id===user.id} onChange={event=>void changeRole(row,event.target.value as "user"|"trainer"|"admin")}><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>}
+      {tab==="Users"&&<><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td><select aria-label={"Role for "+row.email} value={row.role} disabled={row.id===user.id} onChange={event=>void changeRole(row,event.target.value as "user"|"trainer"|"admin")}><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>
+        <div className="gt-panel-head"><span className="gt-muted">{userTotal===0?"No users found":`Showing ${userOffset+1}–${Math.min(userOffset+users.length,userTotal)} of ${userTotal}`}</span><div className="gt-panel-tools"><button className="gt-secondary" disabled={userOffset===0} onClick={()=>setUserOffset(Math.max(0,userOffset-pageSize))}>Previous</button><button className="gt-secondary" disabled={userOffset+pageSize>=userTotal} onClick={()=>setUserOffset(userOffset+pageSize)}>Next</button></div></div>
+      </>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
       {tab==="Security"&&<><div className="gt-security-count"><strong>{security.failed_logins_24h}</strong><span>failed or blocked login events in the last 24 hours</span></div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>Email</th><th>Event</th><th>IP</th><th>Browser</th></tr></thead><tbody>{security.events.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.ip_address||"—"}</td><td>{row.user_agent||"—"}</td></tr>)}</tbody></table></div></>}</section>
     <section className="gt-panel"><p className="gt-eyebrow">DATA EXPORTS</p><h3>Download reports</h3><div className="gt-export-actions"><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/users","gymtrack-users.csv")}>Users CSV</button><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/members","gymtrack-members.csv")}>Members CSV</button><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/activity","gymtrack-activity.csv")}>Activity CSV</button></div></section>
