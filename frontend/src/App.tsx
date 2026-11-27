@@ -42,10 +42,11 @@ const modules: Record<string, Module> = {
 // Five clear navigation items for each role, aligned with the GymTrack PRD.
 const navAdmin = ["Overview", "People", "Operations", "Workouts", "Administration"];
 const navUser = ["Overview", "My Membership", "My Attendance", "My Workouts", "Groups"];
+const navTrainer = ["Overview", "Trainer Portal", "My Membership", "My Attendance", "My Workouts", "Groups"];
 const icons: Record<string, string> = {
   Overview: "▦", People: "♙", Operations: "▤", Workouts: "⌁", Groups: "◎",
   "My Membership": "▤", "My Attendance": "◷", "My Workouts": "⌁",
-  Administration: "⚙", Profile: "◉",
+  Administration: "⚙", "Trainer Portal": "♧", Profile: "◉",
 };
 
 function initials(name: string) {
@@ -573,10 +574,10 @@ function DataModule({ name, user }: { name: string; user: GymUser }) {
   function create(){setEditing(null);setForm(defaults(spec.fields));setShow(true);setError("");setMessage("");}
   function edit(row:GymRow){const next=defaults(spec.fields);spec.fields.forEach(field=>{if(row[field.key]!==undefined&&row[field.key]!==null)next[field.key]=row[field.key];});setEditing(row);setForm(next);setShow(true);setError("");setMessage("");}
   async function save(event:FormEvent){event.preventDefault();setSaving(true);setError("");try{await api(editing?spec.path+"/"+editing.id:spec.path,editing?(name==="Memberships"?"PATCH":"PUT"):"POST",form);setMessage(editing?"Record updated.":"Record created.");setShow(false);setEditing(null);await load();}catch(e){setError(e instanceof Error?e.message:"Could not save record");}finally{setSaving(false);}}
-  async function remove(row:GymRow){if(!window.confirm("Delete this record?"))return;try{await api(spec.path+"/"+row.id,"DELETE");setMessage("Record deleted.");await load();}catch(e){setError(e instanceof Error?e.message:"Could not delete record");}}
+  async function remove(row:GymRow){const action=name==="Trainers"?"Deactivate":"Delete";if(!window.confirm(action+" this record?"))return;try{await api(spec.path+"/"+row.id,"DELETE");setMessage(name==="Trainers"?"Trainer access deactivated.":"Record deleted.");await load();}catch(e){setError(e instanceof Error?e.message:"Could not delete record");}}
   async function checkOut(row:GymRow){try{await api("/api/attendance/"+row.id+"/checkout","PATCH");setMessage("Member checked out.");await load();}catch(e){setError(e instanceof Error?e.message:"Could not check out");}}
   return <div className="gt-page-stack">
-    <section className="gt-section-title"><div><p className="gt-eyebrow">GYM OPERATIONS</p><h2>{name}</h2><p className="gt-muted">{admin?"Manage your gym's "+name.toLowerCase()+".":"View records linked to your account."}</p></div>{admin&&spec.create&&<button className="gt-primary" onClick={create}>+ Add {name==="Workout Plans"?"plan":name==="Attendance"?"check-in":name.slice(0,-1)}</button>}</section>
+    <section className="gt-section-title"><div><p className="gt-eyebrow">GYM OPERATIONS</p><h2>{name}</h2><p className="gt-muted">{admin?"Manage your gym's "+name.toLowerCase()+".":"View records linked to your account."}</p>{name==="Trainers"&&<p className="gt-muted">To promote a trainer, first ask them to sign up normally. Then add the exact email address they used for their GymTrack account.</p>}</div>{admin&&spec.create&&<button className="gt-primary" onClick={create}>+ Add {name==="Workout Plans"?"plan":name==="Attendance"?"check-in":name.slice(0,-1)}</button>}</section>
     {message&&<div className="gt-alert success">{message}</div>}{error&&<div className="gt-alert error">{error}</div>}
     {show&&<section className="gt-panel"><div className="gt-panel-head"><h3>{editing?"Edit":"Add"} {name==="Workout Plans"?"workout plan":name.slice(0,-1)}</h3><button className="gt-secondary" type="button" onClick={()=>setShow(false)}>Close</button></div>
       <form className="gt-form-grid" onSubmit={save}>{spec.fields.map(field=><label className={field.type==="checkbox"?"gt-checkbox-field":"gt-field"} key={field.key}>{field.type==="checkbox"?<><input type="checkbox" checked={Boolean(form[field.key])} onChange={e=>setForm(old=>({...old,[field.key]:e.target.checked}))}/>{field.label}</>:<>{field.label}{field.type==="select"?<select value={String(form[field.key]??"")} onChange={e=>setForm(old=>({...old,[field.key]:e.target.value}))}>{field.options?.map(x=><option value={x} key={x}>{x}</option>)}</select>:field.type==="textarea"?<textarea rows={3} value={String(form[field.key]??"")} onChange={e=>setForm(old=>({...old,[field.key]:e.target.value}))}/>:<input type={field.type||"text"} value={String(form[field.key]??"")} required={field.required!==false} onChange={e=>setForm(old=>({...old,[field.key]:field.type==="number"?Number(e.target.value):e.target.value}))}/>}</>}</label>)}
@@ -584,7 +585,7 @@ function DataModule({ name, user }: { name: string; user: GymUser }) {
     </section>}
     <section className="gt-panel"><div className="gt-panel-head"><div><p className="gt-eyebrow">RECORD DIRECTORY</p><h3>{name} ({rows.length})</h3></div><button className="gt-secondary" onClick={()=>void load()}>Refresh</button></div>
       {loading?<p className="gt-empty">Loading records…</p>:!rows.length?<div className="gt-empty-state"><strong>No {name.toLowerCase()} yet</strong><p>Records saved in this module will appear here.</p></div>:
-      <div className="gt-table-wrap"><table className="gt-table"><thead><tr>{spec.columns.map(key=><th key={key}>{key.replaceAll("_"," ")}</th>)}<th>ID</th>{(admin&&(spec.edit||spec.remove)||name==="Attendance"&&admin)&&<th>Actions</th>}</tr></thead><tbody>{rows.map(row=><tr key={row.id}>{spec.columns.map(key=><td key={key}>{key==="is_active"?<span className={row[key]?"gt-status active":"gt-status"}>{row[key]?"Active":"Inactive"}</span>:showValue(row[key])}</td>)}<td>#{row.id}</td>{admin&&(spec.edit||spec.remove||name==="Attendance")&&<td><div className="gt-actions">{spec.edit&&<button onClick={()=>edit(row)}>Edit</button>}{name==="Attendance"&&!row.check_out&&<button onClick={()=>void checkOut(row)}>Check out</button>}{spec.remove&&<button className="danger" onClick={()=>void remove(row)}>Delete</button>}</div></td>}</tr>)}</tbody></table></div>}
+      <div className="gt-table-wrap"><table className="gt-table"><thead><tr>{spec.columns.map(key=><th key={key}>{key.replaceAll("_"," ")}</th>)}<th>ID</th>{(admin&&(spec.edit||spec.remove)||name==="Attendance"&&admin)&&<th>Actions</th>}</tr></thead><tbody>{rows.map(row=><tr key={row.id}>{spec.columns.map(key=><td key={key}>{key==="is_active"?<span className={row[key]?"gt-status active":"gt-status"}>{row[key]?"Active":"Inactive"}</span>:showValue(row[key])}</td>)}<td>#{row.id}</td>{admin&&(spec.edit||spec.remove||name==="Attendance")&&<td><div className="gt-actions">{spec.edit&&<button onClick={()=>edit(row)}>Edit</button>}{name==="Attendance"&&!row.check_out&&<button onClick={()=>void checkOut(row)}>Check out</button>}{spec.remove&&<button className="danger" onClick={()=>void remove(row)}>{name==="Trainers"?"Deactivate":"Delete"}</button>}</div></td>}</tr>)}</tbody></table></div>}
     </section>
     {name==="Workout Plans"&&admin&&<Assignments/>}
   </div>;
@@ -805,6 +806,126 @@ function Profile({user,onUpdate,onLogout}:{user:GymUser;onUpdate:(user:GymUser)=
   </div>;
 }
 
+
+type TrainerAssignment = { assignment: GymRow; plan: GymRow; member: GymRow; progress: GymRow[] };
+type TrainerDashboardData = { trainer: GymRow; assignments: TrainerAssignment[] };
+
+function TrainerPortal() {
+  const [data, setData] = useState<TrainerDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await api<TrainerDashboardData>("/api/trainer/dashboard"));
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load trainer workspace");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  if (loading) return <section className="gt-panel"><p className="gt-empty">Loading your trainer workspace…</p></section>;
+
+  return <div className="gt-page-stack">
+    <section className="gt-section-title">
+      <div>
+        <p className="gt-eyebrow">TRAINER WORKSPACE</p>
+        <h2>Assigned members</h2>
+        <p className="gt-muted">Review only the workout plans assigned to your trainer account and record member progress.</p>
+      </div>
+      <button className="gt-secondary" onClick={() => void load()}>Refresh</button>
+    </section>
+    {error && <div className="gt-alert error">{error}</div>}
+    {!data ? <section className="gt-panel"><div className="gt-empty-state"><strong>Trainer workspace unavailable</strong><p>Ask an administrator to check that your trainer profile is active and linked to your registered email.</p></div></section> : <>
+      <section className="gt-welcome">
+        <div><p className="gt-eyebrow">SIGNED-IN TRAINER</p><h2>{data.trainer.full_name}</h2><p>{data.trainer.specialization || "Gym trainer"} · {data.assignments.length} assigned workout(s)</p></div>
+        <span className="gt-role-tag">TRAINER</span>
+      </section>
+      {!data.assignments.length ? <section className="gt-panel"><div className="gt-empty-state"><strong>No assigned workouts yet</strong><p>An administrator can assign a workout plan to you from Workouts → Assignments.</p></div></section> :
+        <div className="gt-member-workouts">{data.assignments.map(item =>
+          <TrainerAssignmentCard key={item.assignment.id} item={item} onRefresh={load}/>
+        )}</div>
+      }
+    </>}
+  </div>;
+}
+
+function TrainerAssignmentCard({ item, onRefresh }: { item: TrainerAssignment; onRefresh: () => Promise<void> }) {
+  const [completion, setCompletion] = useState(0);
+  const [notes, setNotes] = useState("");
+  const [progressDate, setProgressDate] = useState(localDateValue());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function recordProgress(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await api("/api/trainer/assignments/" + item.assignment.id + "/progress", "POST", {
+        completion_percent: completion,
+        notes,
+        progress_date: progressDate,
+      });
+      setNotes("");
+      setMessage("Progress saved.");
+      await onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not record progress");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeStatus(status: string) {
+    setError(""); setMessage("");
+    try {
+      await api("/api/trainer/assignments/" + item.assignment.id + "/status", "PATCH", { status });
+      setMessage("Workout status updated.");
+      await onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update workout status");
+    }
+  }
+
+  return <article className="gt-workout-card">
+    <div className="gt-panel-head">
+      <div><p className="gt-eyebrow">WORKOUT #{item.assignment.id}</p><h3>{item.plan.title}</h3><p className="gt-muted">{item.plan.level} · {item.plan.duration_weeks} weeks</p></div>
+      <label className="gt-field">Status
+        <select value={item.assignment.status} onChange={e => void changeStatus(e.target.value)}>
+          <option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option>
+        </select>
+      </label>
+    </div>
+    <div className="gt-workout-meta"><span>Member: <strong>{item.member.full_name}</strong></span><span>Started: {item.assignment.start_date}</span></div>
+    <p className="gt-muted">{item.plan.description || "No additional workout instructions."}</p>
+    {error && <div className="gt-alert error">{error}</div>}
+    {message && <div className="gt-alert success">{message}</div>}
+    <form className="gt-form-grid" onSubmit={recordProgress}>
+      <label className="gt-field">Completion percentage
+        <input type="number" min={0} max={100} required value={completion} onChange={e => setCompletion(Number(e.target.value))}/>
+      </label>
+      <label className="gt-field">Progress date
+        <input type="date" required value={progressDate} onChange={e => setProgressDate(e.target.value)}/>
+      </label>
+      <label className="gt-field">Progress notes
+        <textarea rows={2} maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Record form, strength, consistency or next steps."/>
+      </label>
+      <div className="gt-form-actions"><button className="gt-primary" disabled={saving}>{saving ? "Saving…" : "Save progress"}</button></div>
+    </form>
+    <h4 className="gt-subheading">Recent progress</h4>
+    {!item.progress.length ? <p className="gt-empty">No progress entries recorded for this assignment.</p> : item.progress.slice(0, 4).map(row =>
+      <div className="gt-simple-row" key={row.id}><strong>{row.completion_percent}% complete</strong><span>{row.progress_date} · {row.notes || "No note"}</span></div>
+    )}
+  </article>;
+}
+
 export default function App(){
   const [user,setUser]=useState<GymUser|null>(null),[checking,setChecking]=useState(true),[page,setPage]=useState("Overview"),[apiStatus,setApiStatus]=useState("Checking...");
   const clear=useCallback(()=>{clearAccessToken();setUser(null);setPage("Overview");},[]);
@@ -816,7 +937,7 @@ export default function App(){
     return()=>{live=false;window.removeEventListener("gymtrack:logout",clear);};
   },[clear]);
   async function signOut(){try{await logout();}finally{clear();}}
-  const navigation=user?.role==="admin"?navAdmin:navUser;
+  const navigation=user?.role==="admin"?navAdmin:user?.is_trainer?navTrainer:navUser;
   useEffect(()=>{if(user&&!navigation.includes(page)&&page!=="Profile")setPage("Overview");},[user,page,navigation.join("|")]);
   if(checking)return <div className="gt-loading"><div className="gt-spinner"/><p>Restoring GymTrack session…</p></div>;
   if(!user)return <LoginScreen onLogin={setUser}/>;
@@ -827,17 +948,18 @@ export default function App(){
       {navigation.map(item=><button key={item} className={page===item?"nav-link active":"nav-link"} onClick={()=>setPage(item)}>{icons[item]} &nbsp; {item}</button>)}
       <div className="sidebar-footer">
         <span className="avatar">{initials(user.full_name)}</span>
-        <button className="gt-account-link" onClick={()=>setPage("Profile")}><strong>{user.full_name}</strong><small>{user.role==="admin"?"Administrator":"Member"} · Profile</small></button>
+        <button className="gt-account-link" onClick={()=>setPage("Profile")}><strong>{user.full_name}</strong><small>{user.role==="admin"?"Administrator":user.is_trainer?"Trainer":"Member"} · Profile</small></button>
         <button className="gt-side-logout" title="Log out" onClick={()=>void signOut()}>↪</button>
       </div>
     </aside>
     <main className="main">
-      <header className="page-header"><div><p className="eyebrow">YOUR GYM, ORGANIZED</p><h1>{page==="Workouts"?"Workout Plans":page}</h1><p className="subheading">{user.role==="admin"?"Administrator workspace":"Your personal gym workspace"}</p></div><span className={apiStatus==="Connected"?"api-status connected":"api-status"}><span className="status-dot"/> API: {apiStatus}</span></header>
+      <header className="page-header"><div><p className="eyebrow">YOUR GYM, ORGANIZED</p><h1>{page==="Workouts"?"Workout Plans":page}</h1><p className="subheading">{user.role==="admin"?"Administrator workspace":user.is_trainer?"Trainer and member workspace":"Your personal gym workspace"}</p></div><span className={apiStatus==="Connected"?"api-status connected":"api-status"}><span className="status-dot"/> API: {apiStatus}</span></header>
       {page==="Overview"&&<Overview user={user}/>}
       {user.role==="admin"&&page==="People"&&<PeoplePage user={user}/>}
       {user.role==="admin"&&page==="Operations"&&<OperationsPage/>}
       {user.role==="admin"&&page==="Workouts"&&<DataModule name="Workout Plans" user={user}/>}
       {user.role==="user"&&page==="Groups"&&<GroupsPage user={user}/>}
+      {user.role==="user"&&user.is_trainer&&page==="Trainer Portal"&&<TrainerPortal/>}
       {page==="My Membership"&&user.role==="user"&&<MemberPortalPage section="My Membership" user={user}/>}
       {page==="My Attendance"&&user.role==="user"&&<MemberPortalPage section="My Attendance" user={user}/>}
       {page==="My Workouts"&&user.role==="user"&&<MemberPortalPage section="My Workouts" user={user}/>}
