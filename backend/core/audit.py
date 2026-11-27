@@ -1,8 +1,12 @@
 from fastapi import Request
 from sqlmodel import Session
 
-from backend.models.activity import ActivityLog
-from backend.models.user import AppUser
+try:
+    from backend.models.activity import ActivityLog
+    from backend.models.user import AppUser
+except ModuleNotFoundError:
+    from models.activity import ActivityLog
+    from models.user import AppUser
 
 
 def client_ip(request: Request) -> str | None:
