@@ -1405,13 +1405,13 @@ def _admin_content_query(db: Session, content_type: str, q: str):
              "details": f"Owner account #{row.created_by}", "created_at": row.created_at}
             for row in rows
         ]
-    elif content_type == "workout_progress":
+    elif content_type == "trainer_progress":
         statement = select(WorkoutProgress)
         if q:
             statement = statement.where(WorkoutProgress.notes.ilike(f"%{q}%"))
         total = db.exec(select(func.count()).select_from(statement.subquery())).one()
         rows = db.exec(
-            statement.order_by(WorkoutProgress.recorded_at.desc()).limit(10000)
+            statement.order_by(WorkoutProgress.created_at.desc()).limit(10000)
         ).all()
         items = [
             {"id": row.id, "label": f"Progress #{row.id}",
@@ -1435,7 +1435,7 @@ def _delete_admin_content_record(db: Session, content_type: str, record_id: int)
         if row is None:
             raise HTTPException(404, "Attendance record not found")
         db.delete(row)
-    elif content_type == "workout_progress":
+    elif content_type == "trainer_progress":
         row = db.get(WorkoutProgress, record_id)
         if row is None:
             raise HTTPException(404, "Progress record not found")
@@ -1484,7 +1484,7 @@ def _delete_admin_content_record(db: Session, content_type: str, record_id: int)
 def admin_content(
     user: ADMIN,
     db: DB,
-    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "workout_progress"] = Query("memberships", alias="type"),
+    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "trainer_progress"] = Query("memberships", alias="type"),
     q: str = "",
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -1501,7 +1501,7 @@ def admin_content(
 
 @app.delete("/api/admin/content/{content_type}/{record_id}", status_code=204)
 def delete_admin_content(
-    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "workout_progress"],
+    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "trainer_progress"],
     record_id: int,
     user: ADMIN,
     db: DB,
@@ -1515,7 +1515,7 @@ def delete_admin_content(
 
 @app.post("/api/admin/content/{content_type}/bulk-delete")
 def bulk_delete_admin_content(
-    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "workout_progress"],
+    content_type: Literal["memberships", "attendance", "workout_plans", "assignments", "groups", "trainer_progress"],
     data: BulkContentDelete,
     user: ADMIN,
     db: DB,
