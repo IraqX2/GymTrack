@@ -16,7 +16,7 @@ GymTrack is a gym-management application for members, trainers, memberships, att
 - Member accounts created by signup; admin-controlled promotion to trainer or admin
 - Server-enforced role authorization and member-owned records
 - Trainer workspace for assigned members/workouts and progress history
-- Admin dashboard with account management, activity/security views and CSV exports
+- Admin dashboard with account search, role/status filters, pagination, account detail, bulk ban/unban, content moderation, activity/security views and filtered CSV exports
 - Member and trainer records, memberships and attendance
 - Attendance requests with an administrator approval/rejection workflow
 - Workout plan management and member/trainer assignments
@@ -105,7 +105,8 @@ Apply the SQL files under `backend/migrations/` in the Supabase SQL Editor befor
 | Attendance | `/api/attendance`, `/api/attendance/requests` |
 | Workout plans | `/api/workout-plans`, `/api/workout-assignments` |
 | Shared teams | `/api/groups` |
-| Administration | `/api/admin/stats`, `/api/admin/users`, `/api/admin/activity`, `/api/admin/security` |
+| Administration | `/api/admin/stats`, `/api/admin/users`, `/api/admin/users/{id}`, `/api/admin/content`, `/api/admin/activity`, `/api/admin/security` |
+| Admin exports | `/api/admin/export/users`, `/api/admin/export/members`, `/api/admin/export/trainers`, `/api/admin/export/memberships`, `/api/admin/export/attendance`, `/api/admin/export/workouts`, `/api/admin/export/assignments`, `/api/admin/export/groups`, `/api/admin/export/activity` |
 
 The API docs page is `/api/docs` on Vercel and `/docs` locally.
 
