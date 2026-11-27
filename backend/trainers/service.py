@@ -35,14 +35,21 @@ def promote_account_to_trainer(payload: TrainerCreate, session: Session) -> Trai
         raise HTTPException(status_code=409, detail="Only a normal user account can be promoted to trainer.")
     if account.is_banned:
         raise HTTPException(status_code=409, detail="A banned account cannot be activated as a trainer.")
-    existing_trainer = repository.trainer_by_email(session, email)
-    if existing_trainer is not None:
-        if existing_trainer.user_id == account.id:
-            raise HTTPException(status_code=409, detail="This account already has a trainer profile.")
-        raise HTTPException(status_code=409, detail="A trainer profile already uses this email.")
     linked = repository.trainer_by_user_id(session, account.id)
     if linked is not None:
         raise HTTPException(status_code=409, detail="This account is already linked to a trainer profile.")
+
+    existing_trainer = repository.trainer_by_email(session, email)
+    if existing_trainer is not None:
+        if existing_trainer.user_id is not None:
+            raise HTTPException(status_code=409, detail="This email is already linked to a trainer account.")
+        # Reuse an existing gym staff record so historical workout assignments remain valid.
+        existing_trainer.full_name = payload.full_name.strip()
+        existing_trainer.phone = payload.phone.strip()
+        existing_trainer.specialization = payload.specialization.strip()
+        existing_trainer.is_active = payload.is_active
+        existing_trainer.user_id = account.id
+        return repository.update_trainer(session, existing_trainer)
 
     trainer = Trainer(
         full_name=payload.full_name.strip(),
