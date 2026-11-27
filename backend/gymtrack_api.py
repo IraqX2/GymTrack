@@ -18,6 +18,7 @@ try:
     from backend.models.user import AppUser
     from backend.models.activity import ActivityLog
     from backend.schemas.trainer import RoleChangeBody
+    from backend.schemas.admin import BulkUserAction, BulkContentDelete
     from backend.core.audit import audit, client_ip
     from backend.core.dependencies import ADMIN, CURRENT, DB, TRAINER
 except ModuleNotFoundError:
@@ -29,6 +30,7 @@ except ModuleNotFoundError:
     from models.user import AppUser
     from models.activity import ActivityLog
     from schemas.trainer import RoleChangeBody
+    from schemas.admin import BulkUserAction, BulkContentDelete
     from core.audit import audit, client_ip
     from core.dependencies import ADMIN, CURRENT, DB, TRAINER
 
@@ -187,11 +189,6 @@ class AssignmentBody(BaseModel):
     start_date: date = Field(default_factory=date.today)
     end_date: date | None = None
     status: str = "active"
-
-class BulkUserAction(BaseModel):
-    user_ids: list[int] = PField(min_length=1, max_length=100)
-    reason: str = PField(default="", max_length=200)
-
 
 class GroupBody(BaseModel):
     name: str = PField(min_length=2, max_length=100)
