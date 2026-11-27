@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, clearAccessToken, exportCsv, login, logout, restoreSession, signup, type GymRow, type GymUser } from "./services/gymtrack";
+import TrainerDashboard from "./pages/TrainerDashboard";
 
 type Field = { key: string; label: string; type?: string; options?: string[]; required?: boolean };
 type Module = { title: string; path: string; fields: Field[]; columns: string[]; adminOnly?: boolean; create?: boolean; edit?: boolean; remove?: boolean };
@@ -42,10 +43,11 @@ const modules: Record<string, Module> = {
 // Five clear navigation items for each role, aligned with the GymTrack PRD.
 const navAdmin = ["Overview", "People", "Operations", "Workouts", "Administration"];
 const navUser = ["Overview", "My Membership", "My Attendance", "My Workouts", "Groups"];
+const navTrainer = [...navUser.slice(0, 4), "My Trainees", "Groups"];
 const icons: Record<string, string> = {
   Overview: "▦", People: "♙", Operations: "▤", Workouts: "⌁", Groups: "◎",
   "My Membership": "▤", "My Attendance": "◷", "My Workouts": "⌁",
-  Administration: "⚙", Profile: "◉",
+  Administration: "⚙", "My Trainees": "♧", Profile: "◉",
 };
 
 function initials(name: string) {
@@ -99,7 +101,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: GymUser) => void }) {
     <section className="gt-auth-card">
       <div className="gt-auth-card-head"><span className="gt-eyebrow">GYMTRACK WORKSPACE</span><div className="gt-tabs"><button className={mode==="login"?"active":""} onClick={()=>{setMode("login");setError("");}}>Sign in</button><button className={mode==="signup"?"active":""} onClick={()=>{setMode("signup");setError("");}}>Sign up</button></div></div>
       <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
-      <p className="gt-muted">{mode === "login" ? "Enter your account details to continue." : "Register a member profile to get started."}</p>
+      <p className="gt-muted">{mode === "login" ? "Enter your account details to continue." : "New accounts start as members. An administrator can promote an account to trainer."}</p>
       <form onSubmit={submit} className="gt-auth-form">
         {mode==="signup" && <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} required minLength={2} autoComplete="name"/></label>}
         <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username"/></label>
@@ -774,7 +776,7 @@ function Administration({user}:{user:GymUser}){
   const [query,setQuery]=useState(""),[error,setError]=useState("");
   const load=useCallback(async()=>{try{if(tab==="Users")setUsers(await api<GymRow[]>("/api/admin/users?q="+encodeURIComponent(query)));if(tab==="Activity")setLogs(await api<GymRow[]>("/api/admin/activity?q="+encodeURIComponent(query)));if(tab==="Security")setSecurity(await api("/api/admin/security"));setError("");}catch(e){setError(e instanceof Error?e.message:"Could not load admin information");}},[tab,query]);
   useEffect(()=>{void load();},[load]);
-  async function changeRole(row:GymRow){const next=row.role==="admin"?"user":"admin";if(!window.confirm("Change "+row.email+" to "+next+"?"))return;try{await api("/api/admin/users/"+row.id+"/role","PATCH",{role:next});await load();}catch(e){setError(e instanceof Error?e.message:"Could not change role");}}
+  async function changeRole(row:GymRow,next:"user"|"trainer"|"admin"){if(next===row.role)return;if(row.id===user.id)return;if(!window.confirm("Change "+row.email+" to "+next+"?"))return;try{await api("/api/admin/users/"+row.id+"/role","PATCH",{role:next});await load();}catch(e){setError(e instanceof Error?e.message:"Could not change role");}}
   async function ban(row:GymRow){if(row.is_banned){try{await api("/api/admin/users/"+row.id+"/unban","POST");await load();}catch(e){setError(e instanceof Error?e.message:"Could not unban user");}return;}const reason=window.prompt("Ban reason:");if(reason===null)return;try{await api("/api/admin/users/"+row.id+"/ban","POST",{reason});await load();}catch(e){setError(e instanceof Error?e.message:"Could not ban user");}}
   async function revoke(row:GymRow){if(!window.confirm("Revoke all sessions for "+row.email+"?"))return;try{await api("/api/admin/users/"+row.id+"/revoke-sessions","POST");}catch(e){setError(e instanceof Error?e.message:"Could not revoke sessions");}}
   return <div className="gt-page-stack"><section className="gt-section-title"><div><p className="gt-eyebrow">SYSTEM CONTROL</p><h2>Administration</h2><p className="gt-muted">Manage accounts, review activity and monitor security.</p></div></section>
@@ -782,7 +784,7 @@ function Administration({user}:{user:GymUser}){
     {error&&<div className="gt-alert error">{error}</div>}
     <section className="gt-panel"><div className="gt-panel-head"><h3>{tab}</h3><div className="gt-panel-tools">{tab!=="Security"&&tab!=="Groups"&&<input placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/>}{tab!=="Groups"&&<button className="gt-secondary" onClick={()=>void load()}>Refresh</button>}</div></div>
       {tab==="Groups"&&<GroupsPage user={user}/>}
-      {tab==="Users"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td>{row.role}</td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button disabled={row.is_banned} onClick={()=>void changeRole(row)}>{row.role==="admin"?"Demote":"Promote"}</button><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>}
+      {tab==="Users"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td><select aria-label={"Role for "+row.email} value={row.role} disabled={row.id===user.id} onChange={event=>void changeRole(row,event.target.value as "user"|"trainer"|"admin")}><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
       {tab==="Security"&&<><div className="gt-security-count"><strong>{security.failed_logins_24h}</strong><span>failed or blocked login events in the last 24 hours</span></div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>Email</th><th>Event</th><th>IP</th><th>Browser</th></tr></thead><tbody>{security.events.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.ip_address||"—"}</td><td>{row.user_agent||"—"}</td></tr>)}</tbody></table></div></>}</section>
     <section className="gt-panel"><p className="gt-eyebrow">DATA EXPORTS</p><h3>Download reports</h3><div className="gt-export-actions"><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/users","gymtrack-users.csv")}>Users CSV</button><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/members","gymtrack-members.csv")}>Members CSV</button><button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/activity","gymtrack-activity.csv")}>Activity CSV</button></div></section>
@@ -816,7 +818,7 @@ export default function App(){
     return()=>{live=false;window.removeEventListener("gymtrack:logout",clear);};
   },[clear]);
   async function signOut(){try{await logout();}finally{clear();}}
-  const navigation=user?.role==="admin"?navAdmin:navUser;
+  const navigation=user?.role==="admin"?navAdmin:user?.role==="trainer"?navTrainer:navUser;
   useEffect(()=>{if(user&&!navigation.includes(page)&&page!=="Profile")setPage("Overview");},[user,page,navigation.join("|")]);
   if(checking)return <div className="gt-loading"><div className="gt-spinner"/><p>Restoring GymTrack session…</p></div>;
   if(!user)return <LoginScreen onLogin={setUser}/>;
@@ -827,20 +829,21 @@ export default function App(){
       {navigation.map(item=><button key={item} className={page===item?"nav-link active":"nav-link"} onClick={()=>setPage(item)}>{icons[item]} &nbsp; {item}</button>)}
       <div className="sidebar-footer">
         <span className="avatar">{initials(user.full_name)}</span>
-        <button className="gt-account-link" onClick={()=>setPage("Profile")}><strong>{user.full_name}</strong><small>{user.role==="admin"?"Administrator":"Member"} · Profile</small></button>
+        <button className="gt-account-link" onClick={()=>setPage("Profile")}><strong>{user.full_name}</strong><small>{user.role==="admin"?"Administrator":user.role==="trainer"?"Trainer":"Member"} · Profile</small></button>
         <button className="gt-side-logout" title="Log out" onClick={()=>void signOut()}>↪</button>
       </div>
     </aside>
     <main className="main">
-      <header className="page-header"><div><p className="eyebrow">YOUR GYM, ORGANIZED</p><h1>{page==="Workouts"?"Workout Plans":page}</h1><p className="subheading">{user.role==="admin"?"Administrator workspace":"Your personal gym workspace"}</p></div><span className={apiStatus==="Connected"?"api-status connected":"api-status"}><span className="status-dot"/> API: {apiStatus}</span></header>
+      <header className="page-header"><div><p className="eyebrow">YOUR GYM, ORGANIZED</p><h1>{page==="Workouts"?"Workout Plans":page}</h1><p className="subheading">{user.role==="admin"?"Administrator workspace":user.role==="trainer"?"Trainer workspace":"Your personal gym workspace"}</p></div><span className={apiStatus==="Connected"?"api-status connected":"api-status"}><span className="status-dot"/> API: {apiStatus}</span></header>
       {page==="Overview"&&<Overview user={user}/>}
       {user.role==="admin"&&page==="People"&&<PeoplePage user={user}/>}
       {user.role==="admin"&&page==="Operations"&&<OperationsPage/>}
       {user.role==="admin"&&page==="Workouts"&&<DataModule name="Workout Plans" user={user}/>}
-      {user.role==="user"&&page==="Groups"&&<GroupsPage user={user}/>}
-      {page==="My Membership"&&user.role==="user"&&<MemberPortalPage section="My Membership" user={user}/>}
-      {page==="My Attendance"&&user.role==="user"&&<MemberPortalPage section="My Attendance" user={user}/>}
-      {page==="My Workouts"&&user.role==="user"&&<MemberPortalPage section="My Workouts" user={user}/>}
+      {user.role!=="admin"&&page==="Groups"&&<GroupsPage user={user}/>}
+      {page==="My Membership"&&user.role!=="admin"&&<MemberPortalPage section="My Membership" user={user}/>}
+      {page==="My Attendance"&&user.role!=="admin"&&<MemberPortalPage section="My Attendance" user={user}/>}
+      {page==="My Workouts"&&user.role!=="admin"&&<MemberPortalPage section="My Workouts" user={user}/>}
+      {page==="My Trainees"&&user.role==="trainer"&&<TrainerDashboard/>}
       {page==="Administration"&&user.role==="admin"&&<Administration user={user}/>}
       {page==="Profile"&&<Profile user={user} onUpdate={setUser} onLogout={()=>void signOut()}/>}
       <footer>GymTrack · CSE309 · React + TypeScript / FastAPI / PostgreSQL</footer>
