@@ -13,9 +13,17 @@ from sqlmodel import Field, Session, SQLModel, select
 try:
     from backend.database import engine
     from backend.models.member import Member
+    from backend.models.trainer import Trainer
+    from backend.models.workout import WorkoutAssignment, WorkoutPlan
+    from backend.models.trainer_progress import WorkoutProgress
+    from backend.schemas.trainer import RoleChangeBody
 except ModuleNotFoundError:
     from database import engine
     from models.member import Member
+    from models.trainer import Trainer
+    from models.workout import WorkoutAssignment, WorkoutPlan
+    from models.trainer_progress import WorkoutProgress
+    from schemas.trainer import RoleChangeBody
 
 
 # Existing PostgreSQL tables: public."user", public.authsession, public.member.
@@ -46,15 +54,6 @@ class AuthSession(SQLModel, table=True):
     user_agent: str | None = None
 
 
-class Trainer(SQLModel, table=True):
-    __tablename__ = "trainer"
-    id: int | None = Field(default=None, primary_key=True)
-    full_name: str
-    email: str = Field(unique=True, index=True)
-    phone: str = ""
-    specialization: str = ""
-    is_active: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Membership(SQLModel, table=True):
@@ -95,28 +94,6 @@ class AttendanceRequest(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class WorkoutPlan(SQLModel, table=True):
-    __tablename__ = "workout_plan"
-    id: int | None = Field(default=None, primary_key=True)
-    title: str
-    description: str = ""
-    level: str = "beginner"
-    duration_weeks: int = 4
-    created_by: int | None = Field(default=None, foreign_key="user.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class WorkoutAssignment(SQLModel, table=True):
-    __tablename__ = "workout_assignment"
-    id: int | None = Field(default=None, primary_key=True)
-    plan_id: int = Field(foreign_key="workout_plan.id")
-    member_id: int = Field(foreign_key="member.id", index=True)
-    trainer_id: int | None = Field(default=None, foreign_key="trainer.id")
-    start_date: date = Field(default_factory=date.today)
-    end_date: date | None = None
-    status: str = "active"
-    assigned_by: int | None = Field(default=None, foreign_key="user.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class GymGroup(SQLModel, table=True):
@@ -190,12 +167,7 @@ class MemberBody(BaseModel):
     join_date: date = Field(default_factory=date.today)
     is_active: bool = True
 
-class TrainerBody(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-    email: EmailStr
-    phone: str = PField(default="", max_length=30)
-    specialization: str = PField(default="", max_length=120)
-    is_active: bool = True
+
 
 class MembershipBody(BaseModel):
     member_id: int
@@ -360,6 +332,15 @@ def admin_user(user: CURRENT):
     return user
 
 ADMIN = Annotated[AppUser, Depends(admin_user)]
+
+
+def trainer_user(user: CURRENT):
+    if user.role != "trainer":
+        raise HTTPException(403, "Trainer permission required")
+    return user
+
+
+TRAINER = Annotated[AppUser, Depends(trainer_user)]
 
 def public_user(user: AppUser):
     return {"id": user.id, "full_name": user.full_name, "email": user.email, "role": user.role,
@@ -574,8 +555,8 @@ def revoke_session(session_id: str, user: CURRENT, db: DB, request: Request, res
 def member_dashboard(user: CURRENT, db: DB):
     # A regular login represents one member profile. Members only receive
     # their own records; administrators use the management modules instead.
-    if user.role != "user":
-        raise HTTPException(403, "Member dashboard is only available to member accounts")
+    if user.role not in {"user", "trainer"}:
+        raise HTTPException(403, "Member dashboard is only available to member and trainer accounts")
     member = get_my_member(db, user)
     my_memberships = db.exec(
         select(Membership).where(Membership.member_id == member.id)
@@ -662,45 +643,6 @@ def remove_member(member_id: int, user: ADMIN, db: DB, request: Request):
     return Response(status_code=204)
 
 
-# Trainers
-@app.get("/api/trainers")
-def trainers(user: CURRENT, db: DB):
-    return db.exec(select(Trainer).order_by(Trainer.full_name)).all()
-
-
-@app.post("/api/trainers", status_code=201)
-def add_trainer(data: TrainerBody, user: ADMIN, db: DB, request: Request):
-    email = str(data.email).lower()
-    if db.exec(select(Trainer).where(Trainer.email == email)).first():
-        raise HTTPException(409, "Trainer email already exists")
-    row = Trainer(**data.model_dump(exclude={"email"}), email=email)
-    db.add(row); db.commit(); db.refresh(row); audit(db, request, "trainer_created", user, "trainer", row.id)
-    return row
-
-
-@app.put("/api/trainers/{trainer_id}")
-def edit_trainer(trainer_id: int, data: TrainerBody, user: ADMIN, db: DB, request: Request):
-    row = db.get(Trainer, trainer_id)
-    if not row: raise HTTPException(404, "Trainer not found")
-    for key, value in data.model_dump().items(): setattr(row, key, str(value).lower() if key == "email" else value)
-    db.add(row); db.commit(); audit(db, request, "trainer_updated", user, "trainer", row.id)
-    return row
-
-
-@app.delete("/api/trainers/{trainer_id}", status_code=204)
-def remove_trainer(trainer_id: int, user: ADMIN, db: DB, request: Request):
-    row = db.get(Trainer, trainer_id)
-    if not row:
-        raise HTTPException(404, "Trainer not found")
-    assigned_work = db.exec(
-        select(WorkoutAssignment).where(WorkoutAssignment.trainer_id == trainer_id)
-    ).first()
-    if assigned_work:
-        raise HTTPException(409, "This trainer has assigned workouts. Mark the trainer inactive instead.")
-    db.delete(row)
-    db.commit()
-    audit(db, request, "trainer_deleted", user, "trainer", trainer_id)
-    return Response(status_code=204)
 
 
 # Memberships
@@ -877,8 +819,8 @@ def create_attendance_request(
     db: DB,
     request: Request,
 ):
-    if user.role != "user":
-        raise HTTPException(403, "Attendance requests are for member accounts.")
+    if user.role not in {"user", "trainer"}:
+        raise HTTPException(403, "Attendance requests are for member and trainer accounts.")
     member = get_my_member(db, user)
     check_in = as_utc(data.requested_check_in)
     check_out = as_utc(data.requested_check_out)
@@ -1216,7 +1158,7 @@ def admin_users(user: ADMIN, db: DB, q: str = "", role: str = "", status: str = 
                 offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)):
     query = select(AppUser).order_by(AppUser.created_at.desc())
     if q: query = query.where(AppUser.full_name.ilike(f"%{q}%") | AppUser.email.ilike(f"%{q}%"))
-    if role in {"admin", "user"}: query = query.where(AppUser.role == role)
+    if role in {"admin", "user", "trainer"}: query = query.where(AppUser.role == role)
     if status == "banned": query = query.where(AppUser.is_banned.is_(True))
     if status == "active": query = query.where(AppUser.is_banned.is_(False))
     rows = db.exec(query.offset(offset).limit(limit)).all()
@@ -1224,14 +1166,26 @@ def admin_users(user: ADMIN, db: DB, q: str = "", role: str = "", status: str = 
 
 
 @app.patch("/api/admin/users/{target_id}/role")
-def change_role(target_id: int, data: dict, user: ADMIN, db: DB, request: Request):
-    if target_id == user.id: raise HTTPException(400, "You cannot change your own role")
-    role = data.get("role")
-    if role not in {"user", "admin"}: raise HTTPException(422, "Role must be user or admin")
+def change_role(target_id: int, data: RoleChangeBody, user: ADMIN, db: DB, request: Request):
+    if target_id == user.id:
+        raise HTTPException(400, "You cannot change your own role")
     target = db.get(AppUser, target_id)
-    if not target: raise HTTPException(404, "User not found")
-    target.role = role; target.updated_at = now(); db.add(target); db.commit()
-    audit(db, request, "role_changed", user, "user", target_id, f"{target.email} -> {role}")
+    if not target:
+        raise HTTPException(404, "User not found")
+
+    previous_role = target.role
+    if data.role == "trainer":
+        from backend.services.trainer_service import ensure_trainer_profile
+        ensure_trainer_profile(db, target)
+    elif previous_role == "trainer":
+        from backend.services.trainer_service import deactivate_trainer_profile
+        deactivate_trainer_profile(db, target.email)
+
+    target.role = data.role
+    target.updated_at = now()
+    db.add(target)
+    db.commit()
+    audit(db, request, "role_changed", user, "user", target_id, f"{target.email} -> {data.role}")
     return public_user(target)
 
 
@@ -1313,6 +1267,14 @@ def startup():
     # In local SQLite only, create tables for models. Supabase uses explicit migrations.
     if os.getenv("VERCEL") != "1":
         SQLModel.metadata.create_all(engine)
+
+
+try:
+    from backend.routers.trainers import router as trainers_router
+except ModuleNotFoundError:
+    from routers.trainers import router as trainers_router
+
+app.include_router(trainers_router)
 
 
 @app.get("/")
