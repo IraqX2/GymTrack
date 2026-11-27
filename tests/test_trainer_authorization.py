@@ -100,6 +100,14 @@ def test_application_registers_trainer_routes():
     paths = set(app.openapi()["paths"])
     assert "/api/trainer/dashboard" in paths
     assert "/api/trainer/assignments/{assignment_id}/progress" in paths
+    assert "/api/admin/users/{target_id}" in paths
+    assert "/api/admin/users/bulk-ban" in paths
+    assert "/api/admin/users/bulk-unban" in paths
+    assert "/api/admin/content" in paths
+    assert "/api/admin/content/{content_type}/{record_id}" in paths
+    assert "/api/admin/content/{content_type}/bulk-delete" in paths
+    assert "/api/admin/export/attendance" in paths
+    assert "/api/admin/export/assignments" in paths
 
 
 def test_password_is_hashed_and_can_be_verified():
