@@ -2,7 +2,7 @@ export type GymUser = {
   id: number;
   full_name: string;
   email: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "trainer";
   is_banned: boolean;
   member_id?: number | null;
 };
