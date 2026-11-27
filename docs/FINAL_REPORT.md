@@ -132,7 +132,7 @@ Online payment processing, biometric entry, nutrition plans, mobile applications
 5. An administrator assigns a workout plan to a member and selects the trainer profile.
 6. The trainer signs in and opens My Trainees.
 7. The dashboard lists only that trainer's assigned workout/member rows.
-8. The trainer can add an in_progress or completed update with notes.
+8. The trainer can add a completion percentage from 0 to 100 with notes.
 9. An attempt to read or update another trainer's assignment is rejected by the backend.
 
 ---
@@ -254,7 +254,7 @@ The Vercel backend requires server-side environment variables:
 - BOOTSTRAP_ADMIN_EMAIL: account permitted to receive initial admin status.
 - FRONTEND_URLS: allowed origins when frontend and API origins differ.
 
-The hosted Supabase project already contains the `trainer_progress` table from migration `20261127071138_gymtrack_trainer_access_and_private_tables`; no additional progress-table migration is required. Verify the connection and schema against the target environment before deployment. Production credentials must never be committed to Git.
+The hosted Supabase project already contains the `trainer_progress` table from migration `20261127071138_gymtrack_trainer_access_and_private_tables`; no additional progress-table migration is required. A read-only schema inspection on 27 November 2026 confirmed the table columns and that its RLS flag is enabled. The inspected trainer, progress, workout-assignment and group-membership tables had no table-specific policies; the browser does not connect directly to the database, and FastAPI performs the authorization checks. Review the server database role and policies before using real member data. Production credentials must never be committed to Git.
 
 ---
 
