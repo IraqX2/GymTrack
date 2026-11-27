@@ -776,6 +776,7 @@ function Administration({user}:{user:GymUser}){
   const [userRole,setUserRole]=useState(""),[userStatus,setUserStatus]=useState("");
   const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[]}>({failed_logins_24h:0,events:[]});
   const [detail,setDetail]=useState<any>(null),[detailLoading,setDetailLoading]=useState(false);
+  const [selectedUserIds,setSelectedUserIds]=useState<number[]>([]);
   const [query,setQuery]=useState(""),[error,setError]=useState("");
   const pageSize=20;
   const load=useCallback(async()=>{
@@ -791,6 +792,25 @@ function Administration({user}:{user:GymUser}){
     }catch(e){setError(e instanceof Error?e.message:"Could not load admin information");}
   },[tab,query,userRole,userStatus,userOffset]);
   useEffect(()=>{void load();},[load]);
+  function toggleUserSelection(id:number,checked:boolean){
+    setSelectedUserIds(current=>checked?[...new Set([...current,id])]:current.filter(value=>value!==id));
+  }
+  function toggleCurrentPageSelection(checked:boolean){
+    const pageIds=users.map(row=>Number(row.id));
+    setSelectedUserIds(current=>checked?[...new Set([...current,...pageIds])]:current.filter(id=>!pageIds.includes(id)));
+  }
+  async function bulkUserAction(action:"ban"|"unban"){
+    if(!selectedUserIds.length)return;
+    const reason=action==="ban"?window.prompt("Reason for bulk ban:"):"";
+    if(action==="ban"&&reason===null)return;
+    if(!window.confirm(`${action==="ban"?"Ban":"Unban"} ${selectedUserIds.length} selected accounts?`))return;
+    try{
+      const endpoint=action==="ban"?"/api/admin/users/bulk-ban":"/api/admin/users/bulk-unban";
+      await api(endpoint,"POST",{user_ids:selectedUserIds,reason:reason||""});
+      setSelectedUserIds([]);
+      await load();
+    }catch(e){setError(e instanceof Error?e.message:"Bulk account action failed");}
+  }
   async function showDetail(row:GymRow){
     setDetailLoading(true);setDetail(null);setError("");
     try{setDetail(await api<any>("/api/admin/users/"+row.id));}
@@ -826,7 +846,11 @@ function Administration({user}:{user:GymUser}){
         <h4>Sessions</h4>{detail.sessions.length?detail.sessions.map((row:any)=><div className="gt-session-row" key={row.id}><div><strong>{row.is_active?"Active":"Revoked/expired"}</strong><small>{row.user_agent||"Browser unavailable"} · {row.ip_address||"IP unavailable"}</small><small>Last used {new Date(row.last_used_at).toLocaleString()}</small></div></div>):<p className="gt-empty">No sessions.</p>}
         <h4>Recent activity</h4>{detail.recent_activity.length?detail.recent_activity.map((row:GymRow)=><div className="gt-simple-row" key={row.id}><strong>{row.action}</strong><span>{new Date(row.created_at).toLocaleString()} · {row.ip_address||"IP unavailable"}</span></div>):<p className="gt-empty">No audit events recorded.</p>}
       </section>}
-      {tab==="Users"&&<><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email}</td><td><select aria-label={"Role for "+row.email} value={row.role} disabled={row.id===user.id} onChange={event=>void changeRole(row,event.target.value as "user"|"trainer"|"admin")}><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button onClick={()=>void showDetail(row)}>Details</button><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>
+      {tab==="Users"&&<><div className="gt-panel-tools">
+        <span className="gt-muted">{selectedUserIds.length} selected</span>
+        <button className="gt-secondary" disabled={!selectedUserIds.length} onClick={()=>void bulkUserAction("ban")}>Bulk ban</button>
+        <button className="gt-secondary" disabled={!selectedUserIds.length} onClick={()=>void bulkUserAction("unban")}>Bulk unban</button>
+      </div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th><input aria-label="Select current page" type="checkbox" checked={users.length>0&&users.every(row=>selectedUserIds.includes(Number(row.id)))} onChange={e=>toggleCurrentPageSelection(e.target.checked)}/></th><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{users.map(row=><tr key={row.id}><td><input aria-label={"Select "+row.email} type="checkbox" checked={selectedUserIds.includes(Number(row.id))} onChange={e=>toggleUserSelection(Number(row.id),e.target.checked)}/></td><td>{row.full_name}</td><td>{row.email}</td><td><select aria-label={"Role for "+row.email} value={row.role} disabled={row.id===user.id} onChange={event=>void changeRole(row,event.target.value as "user"|"trainer"|"admin")}><option value="user">Member</option><option value="trainer">Trainer</option><option value="admin">Admin</option></select></td><td><span className={row.is_banned?"gt-status":"gt-status active"}>{row.is_banned?"Banned":"Active"}</span></td><td><div className="gt-actions"><button onClick={()=>void showDetail(row)}>Details</button><button className="danger" onClick={()=>void ban(row)}>{row.is_banned?"Unban":"Ban"}</button><button onClick={()=>void revoke(row)}>Revoke sessions</button></div></td></tr>)}</tbody></table></div>
         <div className="gt-panel-head"><span className="gt-muted">{userTotal===0?"No users found":`Showing ${userOffset+1}–${Math.min(userOffset+users.length,userTotal)} of ${userTotal}`}</span><div className="gt-panel-tools"><button className="gt-secondary" disabled={userOffset===0} onClick={()=>setUserOffset(Math.max(0,userOffset-pageSize))}>Previous</button><button className="gt-secondary" disabled={userOffset+pageSize>=userTotal} onClick={()=>setUserOffset(userOffset+pageSize)}>Next</button></div></div>
       </>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
