@@ -1078,13 +1078,25 @@ def admin_stats(user: ADMIN, db: DB):
 @app.get("/api/admin/users")
 def admin_users(user: ADMIN, db: DB, q: str = "", role: str = "", status: str = "",
                 offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)):
-    query = select(AppUser).order_by(AppUser.created_at.desc())
-    if q: query = query.where(AppUser.full_name.ilike(f"%{q}%") | AppUser.email.ilike(f"%{q}%"))
-    if role in {"admin", "user", "trainer"}: query = query.where(AppUser.role == role)
-    if status == "banned": query = query.where(AppUser.is_banned.is_(True))
-    if status == "active": query = query.where(AppUser.is_banned.is_(False))
-    rows = db.exec(query.offset(offset).limit(limit)).all()
-    return [public_user(row) for row in rows]
+    query = select(AppUser)
+    if q:
+        query = query.where(AppUser.full_name.ilike(f"%{q}%") | AppUser.email.ilike(f"%{q}%"))
+    if role in {"admin", "user", "trainer"}:
+        query = query.where(AppUser.role == role)
+    if status == "banned":
+        query = query.where(AppUser.is_banned.is_(True))
+    if status == "active":
+        query = query.where(AppUser.is_banned.is_(False))
+
+    from sqlalchemy import func
+    total = db.exec(select(func.count()).select_from(query.subquery())).one()
+    rows = db.exec(query.order_by(AppUser.created_at.desc()).offset(offset).limit(limit)).all()
+    return {
+        "items": [public_user(row) for row in rows],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 @app.patch("/api/admin/users/{target_id}/role")
