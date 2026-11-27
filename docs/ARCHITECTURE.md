@@ -35,7 +35,7 @@ SQLModel (Model) -> PostgreSQL / SQLite
 |---|---|---|
 | Model | `backend/models/trainer.py` | Gym trainer profile |
 | Model | `backend/models/workout.py` | Workout plans and assignments |
-| Model | `backend/models/trainer_progress.py` | Trainer progress records |
+| Model | `backend/models/trainer_progress.py` maps the existing `public.trainer_progress` table. | Trainer progress records |
 | Schema | `backend/schemas/trainer.py` | Validated request bodies and role values |
 | Repository | `backend/repositories/trainer_repository.py` | Database reads and writes |
 | Service | `backend/services/trainer_service.py` | Promotion, assignment ownership, progress business rules |
@@ -51,7 +51,7 @@ SQLModel (Model) -> PostgreSQL / SQLite
 - `trainer`: an administrator-promoted account. It retains its linked member profile and gains access to a trainer workspace.
 - `admin`: manages gym operations and user roles.
 
-The trainer record is a gym staff profile. The login account role is stored in the `user` table. The service links them by normalized email when an administrator promotes an account. New signups cannot choose their own role.
+The trainer record is a gym staff profile. The login account role is stored in the `user` table. The service links them through the existing `trainer.user_id` foreign key, using normalized email only as a compatibility fallback. New signups cannot choose their own role.
 
 ## Trainer authorization
 
