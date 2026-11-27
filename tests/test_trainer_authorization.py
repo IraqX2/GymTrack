@@ -33,7 +33,7 @@ def test_trainer_dependency_accepts_trainer_account():
 
 def test_trainer_cannot_read_another_trainers_assignment(monkeypatch):
     trainer = SimpleNamespace(id=12, role="trainer", email="trainer@example.test")
-    assignment = SimpleNamespace(id=44, trainer_id=99)
+    assignment = SimpleNamespace(id=44, trainer_id=99, member_id=31)
     monkeypatch.setattr(
         trainer_service,
         "_require_trainer_profile",
@@ -58,9 +58,12 @@ def test_trainer_cannot_read_another_trainers_assignment(monkeypatch):
 
 def test_trainer_can_record_progress_for_owned_assignment(monkeypatch):
     trainer = SimpleNamespace(id=12, role="trainer", email="trainer@example.test")
-    assignment = SimpleNamespace(id=44, trainer_id=12)
-    payload = SimpleNamespace(status="completed", notes="Good progress")
-    saved = SimpleNamespace(id=7, assignment_id=44, trainer_id=12, status="completed")
+    assignment = SimpleNamespace(id=44, trainer_id=12, member_id=31)
+    payload = SimpleNamespace(completion_percent=75, notes="Good progress")
+    saved = SimpleNamespace(
+        id=7, assignment_id=44, member_id=31, trainer_id=12,
+        completion_percent=75, notes="Good progress",
+    )
     monkeypatch.setattr(
         trainer_service,
         "_require_trainer_profile",
@@ -82,6 +85,8 @@ def test_trainer_can_record_progress_for_owned_assignment(monkeypatch):
     assert result is saved
     assert result.trainer_id == trainer.id
     assert result.assignment_id == assignment.id
+    assert result.member_id == assignment.member_id
+    assert result.completion_percent == 75
 
 def test_access_token_verification_rejects_tampered_token():
     from backend.core.dependencies import current_user
@@ -119,3 +124,13 @@ def test_password_is_hashed_and_can_be_verified():
     assert password_hash != plain_password
     assert check_password(plain_password, password_hash)
     assert not check_password("incorrect-password", password_hash)
+
+
+
+def test_trainer_progress_schema_enforces_percentage_range():
+    from pydantic import ValidationError
+    from backend.schemas.trainer import TrainerProgressCreate
+
+    assert TrainerProgressCreate(completion_percent=100).completion_percent == 100
+    with pytest.raises(ValidationError):
+        TrainerProgressCreate(completion_percent=101)
