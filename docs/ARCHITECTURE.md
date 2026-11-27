@@ -51,7 +51,7 @@ SQLModel (Model) -> PostgreSQL / SQLite
 - `trainer`: an administrator-promoted account. It retains its linked member profile and gains access to a trainer workspace.
 - `admin`: manages gym operations and user roles.
 
-The trainer record is a gym staff profile. The login account role is stored in the `user` table. The service links them through the existing `trainer.user_id` foreign key, using normalized email only as a compatibility fallback. New signups cannot choose their own role.
+The trainer record is a gym staff profile. The login account role is stored in the `user` table. The service links them through the existing `trainer.user_id` foreign key, using `trainer.user_id`, with normalized email only as a compatibility fallback. New signups cannot choose their own role.
 
 ## Trainer authorization
 
