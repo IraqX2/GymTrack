@@ -44,8 +44,7 @@ def test_trainer_cannot_read_another_trainers_assignment(monkeypatch):
         "find_assignment",
         lambda session, assignment_id: assignment,
     )
-    progress_reader = pytest.MonkeyPatch()
-    progress_reader.setattr(
+    monkeypatch.setattr(
         trainer_service.repository,
         "list_progress_for_assignment",
         lambda *args, **kwargs: pytest.fail("Progress must not be read for another trainer"),
@@ -55,7 +54,6 @@ def test_trainer_cannot_read_another_trainers_assignment(monkeypatch):
         trainer_service.list_assignment_progress(object(), trainer, 44)
 
     assert error.value.status_code == 404
-    progress_reader.undo()
 
 
 def test_trainer_can_record_progress_for_owned_assignment(monkeypatch):
