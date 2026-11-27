@@ -1,9 +1,15 @@
 from sqlmodel import Session, select
 
-from backend.models.member import Member
-from backend.models.trainer import Trainer
-from backend.models.trainer_progress import WorkoutProgress
-from backend.models.workout import WorkoutAssignment, WorkoutPlan
+try:
+    from backend.models.member import Member
+    from backend.models.trainer import Trainer
+    from backend.models.trainer_progress import WorkoutProgress
+    from backend.models.workout import WorkoutAssignment, WorkoutPlan
+except ModuleNotFoundError:
+    from models.member import Member
+    from models.trainer import Trainer
+    from models.trainer_progress import WorkoutProgress
+    from models.workout import WorkoutAssignment, WorkoutPlan
 
 
 def list_trainers(session: Session) -> list[Trainer]:
