@@ -34,7 +34,6 @@ GymTrack/
 │   ├── repositories/ Database queries
 │   ├── services/  Domain/business rules
 │   ├── routers/   FastAPI route handlers
-│   └── migrations/ Hosted database migrations
 ├── docs/           Requirements, design and final report
 └── vercel.json
 ```
