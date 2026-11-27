@@ -75,9 +75,12 @@ def delete_trainer_record(session: Session, trainer_id: int) -> None:
 
 
 def ensure_trainer_profile(session: Session, account) -> Trainer:
-    """Create or reactivate a staff profile when an admin promotes an account."""
+    """Link an admin-promoted login account to its trainer staff profile."""
     email = account.email.strip().lower()
-    trainer = repository.find_trainer_by_email(session, email)
+    trainer = repository.find_trainer_by_user_id(session, account.id)
+    if trainer is None:
+        trainer = repository.find_trainer_by_email(session, email)
+
     member = session.exec(select(Member).where(Member.user_id == account.id)).first()
 
     if trainer is None:
@@ -87,12 +90,21 @@ def ensure_trainer_profile(session: Session, account) -> Trainer:
             phone=member.phone if member else "",
             specialization="General fitness",
             is_active=True,
+            user_id=account.id,
         )
         session.add(trainer)
         session.flush()
         return trainer
 
+    if trainer.user_id not in (None, account.id):
+        raise HTTPException(
+            status_code=409,
+            detail="This trainer profile is already linked to another account.",
+        )
+
     trainer.full_name = account.full_name
+    trainer.email = email
+    trainer.user_id = account.id
     if member and not trainer.phone:
         trainer.phone = member.phone
     trainer.is_active = True
@@ -113,9 +125,19 @@ def _require_trainer_profile(session: Session, account) -> Trainer:
     if account.role != "trainer":
         raise HTTPException(status_code=403, detail="Trainer permission required.")
 
-    trainer = repository.find_trainer_by_email(session, account.email)
+    trainer = repository.find_trainer_by_user_id(session, account.id)
+    if trainer is None:
+        trainer = repository.find_trainer_by_email(session, account.email)
+
     if trainer is None or not trainer.is_active:
         raise HTTPException(status_code=403, detail="Your trainer profile is inactive.")
+    if trainer.user_id not in (None, account.id):
+        raise HTTPException(status_code=403, detail="Your trainer profile is linked elsewhere.")
+
+    if trainer.user_id is None:
+        trainer.user_id = account.id
+        session.add(trainer)
+        session.flush()
     return trainer
 
 
@@ -165,8 +187,9 @@ def record_assignment_progress(
 
     progress = WorkoutProgress(
         assignment_id=assignment.id,
+        member_id=assignment.member_id,
         trainer_id=trainer.id,
-        status=payload.status,
+        completion_percent=payload.completion_percent,
         notes=payload.notes.strip(),
     )
     return repository.add_progress(session, progress)
