@@ -188,6 +188,11 @@ class AssignmentBody(BaseModel):
     end_date: date | None = None
     status: str = "active"
 
+class BulkUserAction(BaseModel):
+    user_ids: list[int] = PField(min_length=1, max_length=100)
+    reason: str = PField(default="", max_length=200)
+
+
 class GroupBody(BaseModel):
     name: str = PField(min_length=2, max_length=100)
 
@@ -1211,6 +1216,52 @@ def change_role(target_id: int, data: RoleChangeBody, user: ADMIN, db: DB, reque
     db.commit()
     audit(db, request, "role_changed", user, "user", target_id, f"{target.email} -> {data.role}")
     return public_user(target)
+
+
+@app.post("/api/admin/users/bulk-ban")
+def bulk_ban_users(data: BulkUserAction, user: ADMIN, db: DB, request: Request):
+    user_ids = list(dict.fromkeys(data.user_ids))
+    if user.id in user_ids:
+        raise HTTPException(400, "You cannot ban your own account")
+    targets = db.exec(select(AppUser).where(AppUser.id.in_(user_ids))).all()
+    if len(targets) != len(user_ids):
+        raise HTTPException(404, "One or more users were not found")
+    if any(target.role == "admin" for target in targets):
+        raise HTTPException(400, "Bulk ban cannot include administrator accounts")
+
+    for target in targets:
+        target.is_banned = True
+        db.add(target)
+        for session in db.exec(
+            select(AuthSession).where(
+                AuthSession.user_id == target.id,
+                AuthSession.revoked_at.is_(None),
+            )
+        ).all():
+            session.revoked_at = now()
+            db.add(session)
+    db.commit()
+
+    for target in targets:
+        audit(db, request, "user_banned", user, "user", target.id, data.reason[:200])
+    return {"count": len(targets), "users": [public_user(target) for target in targets]}
+
+
+@app.post("/api/admin/users/bulk-unban")
+def bulk_unban_users(data: BulkUserAction, user: ADMIN, db: DB, request: Request):
+    user_ids = list(dict.fromkeys(data.user_ids))
+    targets = db.exec(select(AppUser).where(AppUser.id.in_(user_ids))).all()
+    if len(targets) != len(user_ids):
+        raise HTTPException(404, "One or more users were not found")
+
+    for target in targets:
+        target.is_banned = False
+        db.add(target)
+    db.commit()
+
+    for target in targets:
+        audit(db, request, "user_unbanned", user, "user", target.id)
+    return {"count": len(targets), "users": [public_user(target) for target in targets]}
 
 
 @app.post("/api/admin/users/{target_id}/ban")
