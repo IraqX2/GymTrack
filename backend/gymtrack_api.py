@@ -51,6 +51,7 @@ class Trainer(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     full_name: str
     email: str = Field(unique=True, index=True)
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
     phone: str = ""
     specialization: str = ""
     is_active: bool = True
@@ -116,6 +117,18 @@ class WorkoutAssignment(SQLModel, table=True):
     end_date: date | None = None
     status: str = "active"
     assigned_by: int | None = Field(default=None, foreign_key="user.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class WorkoutProgress(SQLModel, table=True):
+    __tablename__ = "trainer_progress"
+    id: int | None = Field(default=None, primary_key=True)
+    assignment_id: int = Field(foreign_key="workout_assignment.id", index=True)
+    member_id: int = Field(foreign_key="member.id", index=True)
+    trainer_id: int = Field(foreign_key="trainer.id", index=True)
+    completion_percent: int = Field(ge=0, le=100)
+    notes: str = Field(default="", max_length=1000)
+    progress_date: date = Field(default_factory=date.today)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -188,13 +201,6 @@ class MemberBody(BaseModel):
     email: EmailStr
     phone: str = PField(default="", max_length=30)
     join_date: date = Field(default_factory=date.today)
-    is_active: bool = True
-
-class TrainerBody(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-    email: EmailStr
-    phone: str = PField(default="", max_length=30)
-    specialization: str = PField(default="", max_length=120)
     is_active: bool = True
 
 class MembershipBody(BaseModel):
@@ -361,9 +367,22 @@ def admin_user(user: CURRENT):
 
 ADMIN = Annotated[AppUser, Depends(admin_user)]
 
-def public_user(user: AppUser):
-    return {"id": user.id, "full_name": user.full_name, "email": user.email, "role": user.role,
-            "is_banned": user.is_banned, "created_at": user.created_at}
+def public_user(user: AppUser, db: Session | None = None):
+    trainer = None
+    if db is not None and user.role == "user":
+        trainer = db.exec(
+            select(Trainer).where(Trainer.user_id == user.id, Trainer.is_active.is_(True))
+        ).first()
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "role": user.role,
+        "is_banned": user.is_banned,
+        "is_trainer": trainer is not None,
+        "trainer_id": trainer.id if trainer else None,
+        "created_at": user.created_at,
+    }
 
 def get_my_member(db: Session, user: AppUser):
     member = db.exec(select(Member).where(Member.user_id == user.id)).first()
@@ -449,7 +468,7 @@ def signup(data: Signup, request: Request, response: Response, db: DB):
                        user_agent=(request.headers.get("user-agent") or "")[:250]))
     db.commit(); set_cookie(response, refresh)
     audit(db, request, "signup", user, "user", user.id)
-    return {"user": public_user(user), "access_token": issue_access(user), "token_type": "bearer",
+    return {"user": public_user(user, db), "access_token": issue_access(user), "token_type": "bearer",
             "expires_in": ACCESS_MINUTES*60}
 
 
@@ -482,7 +501,7 @@ def login(data: Login, request: Request, response: Response, db: DB):
                        expires_at=now()+timedelta(days=REFRESH_DAYS), ip_address=client_ip(request),
                        user_agent=(request.headers.get("user-agent") or "")[:250]))
     db.commit(); set_cookie(response, refresh); audit(db, request, "login", user)
-    return {"user": public_user(user), "access_token": issue_access(user), "token_type": "bearer",
+    return {"user": public_user(user, db), "access_token": issue_access(user), "token_type": "bearer",
             "expires_in": ACCESS_MINUTES*60}
 
 
@@ -503,7 +522,7 @@ def refresh(request: Request, response: Response, db: DB):
     token_row.refresh_token_hash = hash_refresh(new_refresh)
     token_row.last_used_at = now(); token_row.ip_address = client_ip(request)
     db.add(token_row); db.commit(); set_cookie(response, new_refresh)
-    return {"user": public_user(user), "access_token": issue_access(user), "token_type": "bearer",
+    return {"user": public_user(user, db), "access_token": issue_access(user), "token_type": "bearer",
             "expires_in": ACCESS_MINUTES*60}
 
 
@@ -522,7 +541,7 @@ def logout(request: Request, response: Response, db: DB):
 @app.get("/api/me")
 def me(user: CURRENT, db: DB):
     member = db.exec(select(Member).where(Member.user_id == user.id)).first()
-    return {**public_user(user), "member_id": member.id if member else None, "phone": member.phone if member else ""}
+    return {**public_user(user, db), "member_id": member.id if member else None, "phone": member.phone if member else ""}
 
 
 @app.patch("/api/me")
@@ -533,7 +552,7 @@ def update_me(data: ProfilePatch, user: CURRENT, db: DB, request: Request):
     if member:
         member.full_name = user.full_name; db.add(member)
     db.commit(); audit(db, request, "profile_updated", user)
-    return public_user(user)
+    return public_user(user, db)
 
 
 @app.post("/api/me/password", status_code=204)
@@ -597,6 +616,11 @@ def member_dashboard(user: CURRENT, db: DB):
             "assignment": assignment,
             "plan": plan,
             "trainer": trainer,
+            "progress": db.exec(
+                select(WorkoutProgress)
+                .where(WorkoutProgress.assignment_id == assignment.id)
+                .order_by(WorkoutProgress.progress_date.desc(), WorkoutProgress.created_at.desc())
+            ).all(),
         }
         for assignment, plan, trainer in assignment_rows
     ]
@@ -662,46 +686,7 @@ def remove_member(member_id: int, user: ADMIN, db: DB, request: Request):
     return Response(status_code=204)
 
 
-# Trainers
-@app.get("/api/trainers")
-def trainers(user: CURRENT, db: DB):
-    return db.exec(select(Trainer).order_by(Trainer.full_name)).all()
-
-
-@app.post("/api/trainers", status_code=201)
-def add_trainer(data: TrainerBody, user: ADMIN, db: DB, request: Request):
-    email = str(data.email).lower()
-    if db.exec(select(Trainer).where(Trainer.email == email)).first():
-        raise HTTPException(409, "Trainer email already exists")
-    row = Trainer(**data.model_dump(exclude={"email"}), email=email)
-    db.add(row); db.commit(); db.refresh(row); audit(db, request, "trainer_created", user, "trainer", row.id)
-    return row
-
-
-@app.put("/api/trainers/{trainer_id}")
-def edit_trainer(trainer_id: int, data: TrainerBody, user: ADMIN, db: DB, request: Request):
-    row = db.get(Trainer, trainer_id)
-    if not row: raise HTTPException(404, "Trainer not found")
-    for key, value in data.model_dump().items(): setattr(row, key, str(value).lower() if key == "email" else value)
-    db.add(row); db.commit(); audit(db, request, "trainer_updated", user, "trainer", row.id)
-    return row
-
-
-@app.delete("/api/trainers/{trainer_id}", status_code=204)
-def remove_trainer(trainer_id: int, user: ADMIN, db: DB, request: Request):
-    row = db.get(Trainer, trainer_id)
-    if not row:
-        raise HTTPException(404, "Trainer not found")
-    assigned_work = db.exec(
-        select(WorkoutAssignment).where(WorkoutAssignment.trainer_id == trainer_id)
-    ).first()
-    if assigned_work:
-        raise HTTPException(409, "This trainer has assigned workouts. Mark the trainer inactive instead.")
-    db.delete(row)
-    db.commit()
-    audit(db, request, "trainer_deleted", user, "trainer", trainer_id)
-    return Response(status_code=204)
-
+# Trainer endpoints are registered from backend.trainers.router.
 
 # Memberships
 @app.get("/api/memberships")
@@ -1220,7 +1205,7 @@ def admin_users(user: ADMIN, db: DB, q: str = "", role: str = "", status: str = 
     if status == "banned": query = query.where(AppUser.is_banned.is_(True))
     if status == "active": query = query.where(AppUser.is_banned.is_(False))
     rows = db.exec(query.offset(offset).limit(limit)).all()
-    return [public_user(row) for row in rows]
+    return [public_user(row, db) for row in rows]
 
 
 @app.patch("/api/admin/users/{target_id}/role")
@@ -1232,7 +1217,7 @@ def change_role(target_id: int, data: dict, user: ADMIN, db: DB, request: Reques
     if not target: raise HTTPException(404, "User not found")
     target.role = role; target.updated_at = now(); db.add(target); db.commit()
     audit(db, request, "role_changed", user, "user", target_id, f"{target.email} -> {role}")
-    return public_user(target)
+    return public_user(target, db)
 
 
 @app.post("/api/admin/users/{target_id}/ban")
@@ -1245,7 +1230,7 @@ def ban_user(target_id: int, data: dict, user: ADMIN, db: DB, request: Request):
     for s in db.exec(select(AuthSession).where(AuthSession.user_id == target_id, AuthSession.revoked_at.is_(None))).all():
         s.revoked_at = now(); db.add(s)
     db.commit(); audit(db, request, "user_banned", user, "user", target_id, str(data.get("reason", ""))[:200])
-    return public_user(target)
+    return public_user(target, db)
 
 
 @app.post("/api/admin/users/{target_id}/unban")
@@ -1254,7 +1239,7 @@ def unban_user(target_id: int, user: ADMIN, db: DB, request: Request):
     if not target: raise HTTPException(404, "User not found")
     target.is_banned = False; db.add(target); db.commit()
     audit(db, request, "user_unbanned", user, "user", target_id)
-    return public_user(target)
+    return public_user(target, db)
 
 
 @app.post("/api/admin/users/{target_id}/revoke-sessions", status_code=204)
@@ -1304,6 +1289,14 @@ def export_activity(user: ADMIN, db: DB):
     return csv_response("gymtrack-activity.csv",
         ["id", "email", "action", "entity_type", "entity_id", "ip_address", "user_agent", "created_at"],
         [[a.id, a.email, a.action, a.entity_type, a.entity_id, a.ip_address, a.user_agent, a.created_at] for a in rows])
+
+
+try:
+    from backend.trainers.router import router as trainer_router
+except ModuleNotFoundError:
+    from trainers.router import router as trainer_router
+
+app.include_router(trainer_router)
 
 
 @app.on_event("startup")
