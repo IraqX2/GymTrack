@@ -92,7 +92,9 @@ Online payment processing, biometric entry, nutrition plans, mobile applications
 | FR-17 | Apply group permissions | Backend checks create, edit and assign permissions |
 | FR-18 | Administer user accounts | Admin user listing, role changes, ban/unban and session revocation |
 | FR-19 | Review audit/security events | Activity log and security endpoints |
-| FR-20 | Export management data | CSV exports available for users, members and activity |
+| FR-20 | Export management data | Filter-aware CSV exports for users, members and activity, plus trainers, memberships, attendance, workouts, assignments and groups |
+| FR-21 | Moderate content | Admin can search/page supported records and delete one or multiple memberships, attendance entries, plans, assignments, groups or trainer progress entries |
+| FR-22 | Manage user detail and bulk actions | Admin detail view includes records, groups, sessions and recent activity; bulk ban/unban validates selected accounts |
 
 ## 7. Non-functional requirements
 
@@ -277,11 +279,13 @@ The following tests must be run against the actual preview/production deployment
 | Hosted data persistence | Data remains after redeploy/restart and across devices | To verify live |
 | CSV exports | Downloaded file respects selected scope | To verify live |
 
-## 19. Rubric items not yet evidenced or complete
+## 19. Remaining rubric verification and technical debt
 
-The currently inspected UI/API does not yet evidence every item in the course brief. In particular, the admin UI still needs role/status filters and visible pagination, a comprehensive user detail page, bulk ban/unban actions, full content moderation for records/groups, and exports for all rubric-required resource categories. Automated pytest coverage also needs to be added and run.
+The source now contains admin role/status filters and paginated user results, account detail, bulk ban/unban, a content-moderation tab with single/bulk deletion for supported record categories, filter-aware CSV exports, and failed-login summaries grouped by IP and account. Automated tests are configured in GitHub Actions; the current suite covers authorization dependency behavior, assignment ownership, token rejection, app route registration and password hashing.
 
-These items must not be described as completed until implemented and tested. See REQUIREMENTS_TRACEABILITY.md.
+The following still require verification or further work: live tests against the deployed Supabase database, a review of database grants/RLS, a security review of all legacy endpoints, export and moderation behavior with representative data, test coverage for every login/refresh/logout/member/group path, and a full domain-by-domain extraction of older endpoints from `backend/gymtrack_api.py` into routers/services/repositories. The content-moderation page supports memberships, attendance, workout plans, assignments, groups and trainer progress; it is not a generic delete tool for every table.
+
+Do not represent CI success as proof that live deployment behavior is complete. See REQUIREMENTS_TRACEABILITY.md.
 
 ## 20. Report screenshots and video
 
