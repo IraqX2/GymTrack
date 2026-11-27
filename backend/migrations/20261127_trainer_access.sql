@@ -2,7 +2,7 @@
 -- Apply this once to the Supabase PostgreSQL database before deploying this branch.
 -- Existing trainer rows remain unlinked until an admin adds them again through the app.
 ALTER TABLE public.trainer
-    ADD COLUMN IF NOT EXISTS user_id INTEGER NULL REFERENCES public."user"(id);
+    ADD COLUMN IF NOT EXISTS user_id BIGINT NULL REFERENCES public."user"(id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_trainer_user_id
     ON public.trainer (user_id)
