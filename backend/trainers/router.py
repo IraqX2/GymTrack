@@ -14,7 +14,7 @@ router = APIRouter(tags=["trainers"])
 
 
 @router.get("/api/trainers")
-def get_trainers(user: CURRENT, db: DB):
+def get_trainers(user: ADMIN, db: DB):
     return service.list_trainers(db)
 
 
