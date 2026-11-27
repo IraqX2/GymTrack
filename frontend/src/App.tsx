@@ -777,7 +777,7 @@ function Administration({user}:{user:GymUser}){
   const [contentOffset,setContentOffset]=useState(0),[selectedContentIds,setSelectedContentIds]=useState<number[]>([]);
   const [userTotal,setUserTotal]=useState(0),[userOffset,setUserOffset]=useState(0);
   const [userRole,setUserRole]=useState(""),[userStatus,setUserStatus]=useState("");
-  const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[]}>({failed_logins_24h:0,events:[]});
+  const [security,setSecurity]=useState<{failed_logins_24h:number;events:GymRow[];by_ip:{ip_address:string;count:number}[];by_account:{email:string;count:number}[]}>({failed_logins_24h:0,events:[],by_ip:[],by_account:[]});
   const [detail,setDetail]=useState<any>(null),[detailLoading,setDetailLoading]=useState(false);
   const [selectedUserIds,setSelectedUserIds]=useState<number[]>([]);
   const [query,setQuery]=useState(""),[error,setError]=useState("");
@@ -892,7 +892,11 @@ function Administration({user}:{user:GymUser}){
         <div className="gt-panel-head"><span className="gt-muted">{userTotal===0?"No users found":`Showing ${userOffset+1}–${Math.min(userOffset+users.length,userTotal)} of ${userTotal}`}</span><div className="gt-panel-tools"><button className="gt-secondary" disabled={userOffset===0} onClick={()=>setUserOffset(Math.max(0,userOffset-pageSize))}>Previous</button><button className="gt-secondary" disabled={userOffset+pageSize>=userTotal} onClick={()=>setUserOffset(userOffset+pageSize)}>Next</button></div></div>
       </>}
       {tab==="Activity"&&<div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>IP</th><th>Details</th></tr></thead><tbody>{logs.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.entity_type||"—"} {row.entity_id||""}</td><td>{row.ip_address||"—"}</td><td>{row.details||"—"}</td></tr>)}</tbody></table></div>}
-      {tab==="Security"&&<><div className="gt-security-count"><strong>{security.failed_logins_24h}</strong><span>failed or blocked login events in the last 24 hours</span></div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>Email</th><th>Event</th><th>IP</th><th>Browser</th></tr></thead><tbody>{security.events.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.ip_address||"—"}</td><td>{row.user_agent||"—"}</td></tr>)}</tbody></table></div></>}</section>
+      {tab==="Security"&&<><div className="gt-security-count"><strong>{security.failed_logins_24h}</strong><span>failed or blocked login events in the last 24 hours</span></div>
+        <div className="gt-two-col">
+          <section><h4>Failed logins by IP</h4>{security.by_ip.length?security.by_ip.map(row=><div className="gt-simple-row" key={row.ip_address}><strong>{row.ip_address}</strong><span>{row.count} attempts</span></div>):<p className="gt-empty">No failed logins by IP.</p>}</section>
+          <section><h4>Failed logins by account</h4>{security.by_account.length?security.by_account.map(row=><div className="gt-simple-row" key={row.email}><strong>{row.email}</strong><span>{row.count} attempts</span></div>):<p className="gt-empty">No failed logins by account.</p>}</section>
+        </div><div className="gt-table-wrap"><table className="gt-table"><thead><tr><th>Time</th><th>Email</th><th>Event</th><th>IP</th><th>Browser</th></tr></thead><tbody>{security.events.map(row=><tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td>{row.email||"Unknown"}</td><td>{row.action}</td><td>{row.ip_address||"—"}</td><td>{row.user_agent||"—"}</td></tr>)}</tbody></table></div></>}</section>
     <section className="gt-panel"><p className="gt-eyebrow">DATA EXPORTS</p><h3>Download reports</h3><div className="gt-export-actions">
       <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/users?"+new URLSearchParams({q:query,role:userRole,status:userStatus}),"gymtrack-users.csv")}>Filtered users CSV</button>
       <button className="gt-secondary" onClick={()=>void exportCsv("/api/admin/export/members?q="+encodeURIComponent(query),"gymtrack-members.csv")}>Members CSV</button>
