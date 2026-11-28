@@ -39,6 +39,9 @@ SQLModel (Model) -> PostgreSQL / SQLite
 | Member repository | `backend/repositories/member_repository.py` | Member queries and persistence |
 | Member service | `backend/services/member_service.py` | Member CRUD, ownership checks and history safeguards |
 | Member router | `backend/routers/members.py` | Member HTTP endpoints and role dependencies |
+| Membership repository/service/router | `backend/repositories/membership_repository.py`, `backend/services/membership_service.py`, `backend/routers/memberships.py` | Subscription queries, validation and role-protected CRUD |
+| Attendance repository/service/router | `backend/repositories/attendance_repository.py`, `backend/services/attendance_service.py`, `backend/routers/attendance.py` | Check-in/out and member correction requests |
+| Workout repository/service/router | `backend/repositories/workout_repository.py`, `backend/services/workout_service.py`, `backend/routers/workouts.py` | Plans, assignment validation and member filtering |
 | Group repository | `backend/repositories/group_repository.py` | Group, membership and task queries |
 | Group service | `backend/services/group_service.py` | Ownership and create/edit/assign permission rules |
 | Group router | `backend/routers/groups.py` | Group, membership and group-work endpoints |
