@@ -64,6 +64,14 @@ This document defines GymTrack's current functional and non-functional requireme
 - Logout/revocation prevents refresh-token reuse.
 - Hosted records remain after redeployment/restart.
 
-## 7. Known verification gaps
+## 7. Verification still required before submission
 
-The admin UI still needs rubric-level role/status filters and visible pagination, user detail view, bulk ban/unban and full content moderation. Exports for all rubric resource categories and automated pytest coverage also need completion. Live deployment checks and the report screenshots/video must be supplied before final submission. See [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md).
+The implementation includes admin role/status filters, pagination, user details, bulk ban/unban, supported content moderation and CSV exports. Before submission, complete the remaining verification work:
+
+- Confirm the live Vercel site is accessible to the instructor and connects to Supabase.
+- Demonstrate the member, trainer and admin workflows using the demo accounts.
+- Review Supabase database grants and Row Level Security before using real member data.
+- Add broader automated tests for login failures, refresh rotation, logout/revocation and full admin workflows.
+- Capture the required report screenshots and record the 5–8 minute voice demo.
+
+See [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md).
