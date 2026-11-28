@@ -167,6 +167,9 @@ Member, group and trainer domains are separated into the following layers/files:
 | Member repository | backend/repositories/member_repository.py | Member database queries and persistence |
 | Member service | backend/services/member_service.py | Member CRUD, ownership and gym-history safeguards |
 | Member router/controller | backend/routers/members.py | Member HTTP endpoints with role checks |
+| Membership repository/service/router | backend/repositories/membership_repository.py, backend/services/membership_service.py, backend/routers/memberships.py | Subscription queries and CRUD |
+| Attendance repository/service/router | backend/repositories/attendance_repository.py, backend/services/attendance_service.py, backend/routers/attendance.py | Check-in/out and correction requests |
+| Workout repository/service/router | backend/repositories/workout_repository.py, backend/services/workout_service.py, backend/routers/workouts.py | Plans and assignments |
 | Group repository | backend/repositories/group_repository.py | Group, membership and task queries |
 | Group service | backend/services/group_service.py | Owner rules and create/edit/assign permission checks |
 | Group router/controller | backend/routers/groups.py | Group, membership and task endpoints |
@@ -177,7 +180,7 @@ Member, group and trainer domains are separated into the following layers/files:
 | Audit | backend/core/audit.py | Activity event recording |
 | Views | frontend/src/App.tsx, frontend/src/pages/TrainerDashboard.tsx | User/admin and trainer interfaces |
 
-Membership, attendance, authentication/profile, workout-plan/assignment and admin endpoint handlers still remain in backend/gymtrack_api.py. This report does not claim that the entire legacy API has been migrated. The remaining endpoint-by-endpoint refactor is recorded as technical debt in ARCHITECTURE.md.
+Authentication/profile/session and admin management/export endpoint handlers still remain in backend/gymtrack_api.py. This report does not claim that the entire legacy API has been migrated. The remaining endpoint-by-endpoint refactor is recorded as technical debt in ARCHITECTURE.md.
 
 ## 12. Database design
 
