@@ -31,9 +31,9 @@ GymTrack/
 │   ├── core/        Shared authentication dependencies and audit logging
 │   ├── models/      SQLModel data models, including shared resources
 │   ├── schemas/     Validated API request schemas
-│   ├── repositories/ Database queries for members, groups and trainers
-│   ├── services/   Domain/business rules for members, groups and trainers
-│   ├── routers/    FastAPI controllers for members, groups and trainers
+│   ├── repositories/ Database queries for application domains
+│   ├── services/   Business rules for application domains
+│   ├── routers/    FastAPI controllers for all application domains
 ├── docs/           Requirements, design and final report
 └── vercel.json
 ```
