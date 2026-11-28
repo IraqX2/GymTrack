@@ -7,7 +7,7 @@ CSE309 Web Application & Internet
 Name: Syed Miftahul Islam  
 Student ID: 2430996  
 Section: 6  
-Team Number: Not stated in the supplied submission report
+Team Number: 35
 
 Project Title: GymTrack - Gym Management Web Application  
 Vercel URL: https://gymtrack-nemesis-team.vercel.app/  
@@ -1065,7 +1065,7 @@ The following selected pull requests document the main implementation milestones
 | [#24](https://github.com/IraqX2/GymTrack/pull/24) | Complete MVC separation for auth and admin domains | Auth/admin/member dashboard routers, services and repositories. |
 | [#25](https://github.com/IraqX2/GymTrack/pull/25) | Clean submission report and remove temporary diagnostics | Updated report/docs, removed temporary health diagnostics and unused duplicate route. |
 
-Pull request index: https://github.com/IraqX2/GymTrack/pulls?q=is%3Apr+is%3Aclosed. The repository history shows the listed PRs submitted under the GitHub account `IraqX2`. Individual contributions by any additional team members are not stated in the supplied report and must be represented according to the team's actual contribution history.
+Pull request index: https://github.com/IraqX2/GymTrack/pulls?q=is%3Apr+is%3Aclosed. The listed pull requests were submitted under the GitHub account `IraqX2`.
 
 ### E3. Limitations
 
