@@ -176,11 +176,14 @@ Member, group and trainer domains are separated into the following layers/files:
 | Trainer repository | backend/repositories/trainer_repository.py | Trainer and assignment queries |
 | Trainer service | backend/services/trainer_service.py | Profile promotion, assignment ownership and progress rules |
 | Trainer router/controller | backend/routers/trainers.py | Trainer HTTP endpoints |
+| Auth repository/service/router | backend/repositories/auth_repository.py, backend/services/auth_service.py, backend/routers/auth.py | Account/session data, authentication rules and endpoints |
+| Admin repository/service/router | backend/repositories/admin_repository.py, backend/services/admin_service.py, backend/routers/admin.py | Admin queries, role/ban workflows, content moderation and exports |
+| App entry point | backend/gymtrack_api.py | FastAPI setup, health checks and router registration |
 | Shared dependencies | backend/core/dependencies.py | Signed-in user, admin and trainer authorization |
 | Audit | backend/core/audit.py | Activity event recording |
 | Views | frontend/src/App.tsx, frontend/src/pages/TrainerDashboard.tsx | User/admin and trainer interfaces |
 
-Authentication/profile/session and admin management/export endpoint handlers still remain in backend/gymtrack_api.py. This report does not claim that the entire legacy API has been migrated. The remaining endpoint-by-endpoint refactor is recorded as technical debt in ARCHITECTURE.md.
+The authentication and admin endpoints have been moved into dedicated routers and services. `backend/gymtrack_api.py` is now the application entry point. Admin content moderation and other admin database operations are routed through the admin service/repository layers.
 
 ## 12. Database design
 
