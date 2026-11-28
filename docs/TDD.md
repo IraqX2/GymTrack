@@ -27,13 +27,16 @@ The member, group and trainer domains follow an MVC-style layered architecture:
 | Models | `backend/models/resources.py` | Auth sessions, memberships, attendance and groups |
 | Schemas | `backend/schemas/resources.py` | Shared resource request validation |
 | Member repository/service/router | `backend/repositories/member_repository.py`, `backend/services/member_service.py`, `backend/routers/members.py` | Member queries, ownership and CRUD endpoints |
+| Membership repository/service/router | `backend/repositories/membership_repository.py`, `backend/services/membership_service.py`, `backend/routers/memberships.py` | Subscription data, validation and CRUD endpoints |
+| Attendance repository/service/router | `backend/repositories/attendance_repository.py`, `backend/services/attendance_service.py`, `backend/routers/attendance.py` | Check-in/out and attendance correction requests |
+| Workout repository/service/router | `backend/repositories/workout_repository.py`, `backend/services/workout_service.py`, `backend/routers/workouts.py` | Workout plans and member/trainer assignments |
 | Group repository/service/router | `backend/repositories/group_repository.py`, `backend/services/group_service.py`, `backend/routers/groups.py` | Group data access and permission-enforced endpoints |
 | Trainer repository/service/router | `backend/repositories/trainer_repository.py`, `backend/services/trainer_service.py`, `backend/routers/trainers.py` | Trainer profiles, assignment ownership and progress |
 | Shared security | `backend/core/dependencies.py`, `backend/core/audit.py` | Authentication, role dependencies and audit logging |
 | Trainer view | `frontend/src/pages/TrainerDashboard.tsx` | Trainer view and progress form |
 | API client | `frontend/src/services/gymtrack.ts` | Authenticated API calls and refresh behavior |
 
-Authentication/profile, attendance, membership, workout-plan/assignment and admin endpoint handlers remain in `backend/gymtrack_api.py` and need domain-by-domain extraction.
+Authentication/profile/session and admin endpoint handlers remain in `backend/gymtrack_api.py` and need domain-by-domain extraction.
 
 ## 4. Trainer role flow
 
