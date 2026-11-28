@@ -1,6 +1,6 @@
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
 
@@ -38,28 +38,6 @@ PEPPER = os.getenv("PASSWORD_PEPPER")
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "GymTrack API", "version": "2.0.0"}
-
-
-# Temporary diagnostic for the preview database connection. It never returns credentials.
-@app.get("/api/health/database")
-def database_health():
-    from sqlalchemy import text
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "connected"}
-    except Exception as error:
-        original = getattr(error, "orig", error)
-        # Keep database connection details in server logs only; never expose them to the browser.
-        sqlstate = getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)
-        print(
-            "GYMTRACK_DB_DIAGNOSTIC",
-            type(original).__name__,
-            "sqlstate=" + str(sqlstate),
-            "message=" + str(original)[:350],
-            flush=True,
-        )
-        raise HTTPException(status_code=503, detail="Database connection is unavailable. Check server logs.")
 
 
 @app.on_event("startup")
