@@ -43,9 +43,7 @@ The trainer profile is linked to a login account through the existing `trainer.u
 
 ## Architecture
 
-Member, group, trainer, membership, attendance and workout-plan/assignment domains use separate router/controller, service, repository, schema and model layers. Shared resource models and schemas are also separated from the app entry module. See [ARCHITECTURE.md](ARCHITECTURE.md). This is an independently implemented MVC-style/layered architecture, not copied source code from the instructor's reference.
-
-Authentication/profile/session and admin endpoint handlers remain in `backend/gymtrack_api.py`; those domains still need migration.
+Member, group, trainer, membership, attendance, workout-plan/assignment, authentication/profile/session and administration domains use separate router/controller modules. Business logic is in services and core database access is separated into repositories. The app entry point is limited to setup, health checks, startup and router registration. See [ARCHITECTURE.md](ARCHITECTURE.md). This is an independently implemented MVC-style/layered architecture, not copied source code from the instructor's reference.
 
 ## Important outstanding checks against the course brief
 
@@ -57,7 +55,7 @@ The remaining work is primarily verification and broader quality coverage:
 - Verify the existing `trainer_progress` schema is present on the target database and review database grants/RLS.
 - Expand pytest coverage to login failures, refresh rotation, logout/revocation, group create/edit/assign denial, live membership persistence and full admin workflows.
 - Check moderation/export flows using representative hosted records and confirm exported data respects the active filter choices.
-- Continue migrating authentication/profile/session and admin management/export handlers out of `backend/gymtrack_api.py` into separate routers, services and repositories.
+- Run broader integration tests for authentication/session workflows, admin content moderation and CSV exports against the deployed database.
 - Record the required screenshots and voice demo from the deployed application.
 
 The content-moderation page intentionally supports memberships, attendance, workout plans, assignments, groups and trainer progress. It is not a generic delete operation for every database table. Do not claim live behavior without completing the deployed checks.
