@@ -98,7 +98,8 @@ GymTrack is a web-based gym management application that centralizes member recor
 | Vercel frontend | https://gymtrack-nemesis-team.vercel.app/ |
 | API base | https://gymtrack-nemesis-team.vercel.app/api |
 | API documentation | https://gymtrack-nemesis-team.vercel.app/api/docs |
-| Demo video | Not recorded; no video link is available for this submission. |
+| Google Drive demo video | [Watch recording](https://drive.google.com/file/d/1kgGaEt0FDfeYkm_6RSHR-Z-B_DixB9Nf/view?usp=sharing) |
+| YouTube demo video | [Watch recording](https://www.youtube.com/watch?v=EJdNnCJ_gNw) |
 
 ## Part A. Product Requirements (PRD)
 
@@ -1086,7 +1087,7 @@ Pull request index: https://github.com/IraqX2/GymTrack/pulls?q=is%3Apr+is%3Aclos
 
 **Conclusion**
 
-GymTrack delivers a deployed gym-management application with member, trainer and administrator workflows, backend-enforced role and ownership checks, group permissions, audit/security features and persistent PostgreSQL storage. The final repository also separates the major application domains into router, service and repository layers. GitHub Actions and Vercel deployment checks passed for the latest main commit inspected on 28 November 2026. The submitted PDF contains the application screenshots and private demo-account appendix. A demonstration video was not recorded for this submission.
+GymTrack delivers a deployed gym-management application with member, trainer and administrator workflows, backend-enforced role and ownership checks, group permissions, audit/security features and persistent PostgreSQL storage. The final repository also separates the major application domains into router, service and repository layers. GitHub Actions and Vercel deployment checks passed for the latest main commit inspected on 28 November 2026. The submitted PDF contains the application screenshots and private demo-account appendix. The demonstration recording is linked in Section 1.3 and the Appendix.
 
 ### E5. Sources, Libraries and Tools
 
@@ -1106,10 +1107,13 @@ GymTrack delivers a deployed gym-management application with member, trainer and
 | Supabase | https://supabase.com/docs | Hosted PostgreSQL. |
 | GitHub + Actions | https://docs.github.com/actions | Source control, PR workflow and CI. |
 | Browser DevTools | Chrome DevTools documentation | Network, cookie, request and UI verification. |
-| OpenAI ChatGPT | https://chatgpt.com/ | Used as a development aid for code explanations, troubleshooting and drafting/reviewing project documentation. Project descriptions and technical claims in this report were checked against the repository, CI run and submitted application evidence. |
+| OpenAI ChatGPT | https://chatgpt.com/ | Used as a development aid for debugging discussion, implementation explanation and drafting/reviewing project documentation. |
 
 ## Appendix. Test Accounts and Video Demo
 
 This appendix in the private PDF contains the demo account IDs, passwords, group membership details and permission matrix. Those credentials and account IDs are intentionally excluded from this public repository file. Use demo data only.
 
-**Demo video:** Not recorded. No video link is available for this submission.
+**Demo video links**
+
+- Google Drive: [Watch recording](https://drive.google.com/file/d/1kgGaEt0FDfeYkm_6RSHR-Z-B_DixB9Nf/view?usp=sharing)
+- YouTube: [Watch recording](https://www.youtube.com/watch?v=EJdNnCJ_gNw)
