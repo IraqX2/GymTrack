@@ -37,7 +37,7 @@ except ModuleNotFoundError:
     from services.auth_service import public_user
 
 
-router = APIRouter(prefix="/api/admin", tags=["administration"])
+router = APIRouter(tags=["administration"])
 
 
 @router.get("/api/admin/stats")
