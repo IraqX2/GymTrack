@@ -117,6 +117,33 @@ The API docs page is `/api/docs` on Vercel and `/docs` locally.
 - A trainer sees only workouts and members assigned to that trainer profile; trainer progress endpoints re-check assignment ownership.
 - Only group owners can rename/delete a group or manage its membership. Group create/edit/assign permissions are checked by FastAPI.
 
+
+## Demo account IDs and shared group permissions
+
+The hosted demo database currently contains the following account IDs and roles. Passwords are deliberately excluded from this public repository; enter them only in the private final-submission form.
+
+| User ID | Role |
+|---:|---|
+| 1 | Admin |
+| 5 | Admin |
+| 2 | User/member |
+| 3 | User/member |
+| 4 | User/member |
+| 6 | User/member |
+
+**Shared group: Training Operations Team (Group ID 5)**
+
+Owner: User ID 1 (all group permissions).
+
+| Member user ID | Create tasks | Edit tasks | Assign tasks |
+|---:|---:|---:|---:|
+| 2 | Yes | No | No |
+| 3 | No | Yes | No |
+| 4 | No | No | Yes |
+| 5 | No | No | No |
+
+The deployed demo currently has one trainer staff profile without a linked login account. For the recording, an administrator should promote User ID 6 to Trainer, assign a workout to that trainer, then sign in as User ID 6 to demonstrate the trainer dashboard. User IDs 2, 3 and 4 remain normal demo accounts.
+
 ## Known verification items
 
 The final course rubric still requires live testing and submission artifacts. Review [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) and [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) for the remaining checks. Do not use real member data until Supabase grants/RLS have been reviewed.
