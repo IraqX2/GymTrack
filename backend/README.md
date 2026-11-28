@@ -1,6 +1,6 @@
 # GymTrack Backend
 
-FastAPI REST API starter for GymTrack.
+FastAPI REST API for GymTrack. The application is assembled in `gymtrack_api.py`, with domain routes, services, repositories, models and schemas organized in separate modules.
 
 ## Run locally
 
