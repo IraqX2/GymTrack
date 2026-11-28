@@ -72,6 +72,6 @@ def add_assignment_progress(
         user,
         "workout_assignment",
         assignment_id,
-        f"status={progress.status}",
+        f"completion_percent={progress.completion_percent}",
     )
     return progress
