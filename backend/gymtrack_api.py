@@ -17,8 +17,18 @@ try:
     from backend.models.trainer_progress import WorkoutProgress
     from backend.models.user import AppUser
     from backend.models.activity import ActivityLog
+    from backend.models.resources import (
+        AuthSession, Membership, Attendance, AttendanceRequest,
+        GymGroup, GymGroupMember, GymGroupTask,
+    )
     from backend.schemas.trainer import RoleChangeBody
     from backend.schemas.admin import BulkUserAction, BulkContentDelete
+    from backend.schemas.resources import (
+        Signup, Login, ProfilePatch, PasswordPatch, MemberBody,
+        MembershipBody, AttendanceBody, AttendanceRequestBody,
+        AttendanceRequestReview, PlanBody, AssignmentBody, GroupBody,
+        GroupMemberBody, GroupPermissions, GroupWorkBody, GroupWorkPatch,
+    )
     from backend.core.audit import audit, client_ip
     from backend.core.dependencies import ADMIN, CURRENT, DB, TRAINER
 except ModuleNotFoundError:
@@ -29,193 +39,22 @@ except ModuleNotFoundError:
     from models.trainer_progress import WorkoutProgress
     from models.user import AppUser
     from models.activity import ActivityLog
+    from models.resources import (
+        AuthSession, Membership, Attendance, AttendanceRequest,
+        GymGroup, GymGroupMember, GymGroupTask,
+    )
     from schemas.trainer import RoleChangeBody
     from schemas.admin import BulkUserAction, BulkContentDelete
+    from schemas.resources import (
+        Signup, Login, ProfilePatch, PasswordPatch, MemberBody,
+        MembershipBody, AttendanceBody, AttendanceRequestBody,
+        AttendanceRequestReview, PlanBody, AssignmentBody, GroupBody,
+        GroupMemberBody, GroupPermissions, GroupWorkBody, GroupWorkPatch,
+    )
     from core.audit import audit, client_ip
     from core.dependencies import ADMIN, CURRENT, DB, TRAINER
 
 
-
-
-class AuthSession(SQLModel, table=True):
-    __tablename__ = "authsession"
-    id: str = Field(primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
-    refresh_token_hash: str = Field(unique=True, index=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_used_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: datetime
-    revoked_at: datetime | None = None
-    ip_address: str | None = None
-    user_agent: str | None = None
-
-
-
-
-class Membership(SQLModel, table=True):
-    __tablename__ = "membership"
-    id: int | None = Field(default=None, primary_key=True)
-    member_id: int = Field(foreign_key="member.id", index=True)
-    plan_name: str
-    start_date: date = Field(default_factory=date.today)
-    end_date: date
-    price: float = 0
-    status: str = "active"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class Attendance(SQLModel, table=True):
-    __tablename__ = "attendance"
-    id: int | None = Field(default=None, primary_key=True)
-    member_id: int = Field(foreign_key="member.id", index=True)
-    check_in: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    check_out: datetime | None = None
-    notes: str = ""
-    recorded_by: int | None = Field(default=None, foreign_key="user.id")
-
-
-class AttendanceRequest(SQLModel, table=True):
-    __tablename__ = "attendance_request"
-    id: int | None = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
-    member_id: int = Field(foreign_key="member.id", index=True)
-    requested_check_in: datetime
-    requested_check_out: datetime | None = None
-    notes: str = ""
-    status: str = "pending"
-    reviewed_by: int | None = Field(default=None, foreign_key="user.id")
-    reviewed_at: datetime | None = None
-    review_note: str = ""
-    attendance_id: int | None = Field(default=None, foreign_key="attendance.id", unique=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-
-
-class GymGroup(SQLModel, table=True):
-    __tablename__ = "gym_group"
-    id: int | None = Field(default=None, primary_key=True)
-    name: str
-    created_by: int = Field(foreign_key="user.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class GymGroupMember(SQLModel, table=True):
-    __tablename__ = "gym_group_member"
-    group_id: int = Field(foreign_key="gym_group.id", primary_key=True)
-    user_id: int = Field(foreign_key="user.id", primary_key=True)
-    role: str = "member"
-    can_create: bool = False
-    can_edit: bool = False
-    can_assign: bool = False
-    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class GymGroupTask(SQLModel, table=True):
-    __tablename__ = "gym_group_task"
-    id: int | None = Field(default=None, primary_key=True)
-    group_id: int = Field(foreign_key="gym_group.id", index=True)
-    title: str
-    description: str = ""
-    due_date: date | None = None
-    assigned_to: int | None = Field(default=None, foreign_key="user.id")
-    created_by: int = Field(foreign_key="user.id")
-    is_completed: bool = False
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-
-
-# Request/response schemas.
-class Signup(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-    email: EmailStr
-    password: str = PField(min_length=8, max_length=128)
-
-class Login(BaseModel):
-    email: EmailStr
-    password: str = PField(min_length=1, max_length=128)
-
-class ProfilePatch(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-
-class PasswordPatch(BaseModel):
-    current_password: str
-    new_password: str = PField(min_length=8, max_length=128)
-
-class MemberBody(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-    email: EmailStr
-    phone: str = PField(default="", max_length=30)
-    join_date: date = Field(default_factory=date.today)
-    is_active: bool = True
-
-
-
-class MembershipBody(BaseModel):
-    member_id: int
-    plan_name: str = PField(min_length=2, max_length=100)
-    start_date: date = Field(default_factory=date.today)
-    end_date: date
-    price: float = PField(default=0, ge=0)
-    status: str = "active"
-
-class AttendanceBody(BaseModel):
-    member_id: int
-    check_in: datetime | None = None
-    check_out: datetime | None = None
-    notes: str = PField(default="", max_length=500)
-
-class AttendanceRequestBody(BaseModel):
-    requested_check_in: datetime
-    requested_check_out: datetime | None = None
-    notes: str = PField(default="", max_length=500)
-
-class AttendanceRequestReview(BaseModel):
-    status: Literal["approved", "rejected"]
-    review_note: str = PField(default="", max_length=500)
-
-class PlanBody(BaseModel):
-    title: str = PField(min_length=2, max_length=120)
-    description: str = ""
-    level: str = "beginner"
-    duration_weeks: int = PField(default=4, ge=1, le=52)
-
-class AssignmentBody(BaseModel):
-    plan_id: int
-    member_id: int
-    trainer_id: int | None = None
-    start_date: date = Field(default_factory=date.today)
-    end_date: date | None = None
-    status: str = "active"
-
-class GroupBody(BaseModel):
-    name: str = PField(min_length=2, max_length=100)
-
-class GroupMemberBody(BaseModel):
-    email: EmailStr
-    can_create: bool = False
-    can_edit: bool = False
-    can_assign: bool = False
-
-class GroupPermissions(BaseModel):
-    can_create: bool = False
-    can_edit: bool = False
-    can_assign: bool = False
-
-class GroupWorkBody(BaseModel):
-    title: str = PField(min_length=2, max_length=140)
-    description: str = ""
-    due_date: date | None = None
-    assigned_to: int | None = None
-
-class GroupWorkPatch(BaseModel):
-    title: str | None = PField(default=None, min_length=2, max_length=140)
-    description: str | None = None
-    due_date: date | None = None
-    assigned_to: int | None = None
-    is_completed: bool | None = None
 
 
 # App setup. In production the frontend and API share one Vercel origin.
