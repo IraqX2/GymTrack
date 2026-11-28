@@ -44,7 +44,7 @@ Set local `JWT_SECRET_KEY` and `PASSWORD_PEPPER` values before testing signup/lo
 
 ## Initial accounts
 
-The database currently contains five test accounts: two administrators and three regular users. Their credentials are stored separately from the source repository and must be provided to the instructor only through the required private submission fields/report.
+The hosted demo database currently contains six test accounts: two administrators and four regular users. The account IDs and current roles are listed in the root README. Their credentials are stored separately from the source repository and must be provided to the instructor only through the required private submission fields/report.
 
 Do not store test passwords in this repository or use real personal accounts as demonstration data.
 
