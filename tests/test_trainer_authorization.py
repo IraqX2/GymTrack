@@ -173,6 +173,7 @@ def test_application_registers_trainer_routes():
     paths = set(app.openapi()["paths"])
     assert "/api/trainer/dashboard" in paths
     assert "/api/members" in paths
+    assert "/api/member/dashboard" in paths
     assert "/api/members/{member_id}" in paths
     assert "/api/groups" in paths
     assert "/api/groups/{group_id}/work" in paths
