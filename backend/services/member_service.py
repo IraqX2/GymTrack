@@ -69,3 +69,27 @@ def delete_member_record(session: Session, member_id: int) -> None:
             detail="This member has gym history. Mark the member inactive instead of deleting their records.",
         )
     repository.remove_member(session, member)
+
+def get_member_dashboard(session: Session, account) -> dict:
+    if account.role not in {"user", "trainer"}:
+        raise HTTPException(
+            status_code=403,
+            detail="Member dashboard is only available to member and trainer accounts",
+        )
+    member = repository.find_member_by_user_id(session, account.id)
+    if member is None:
+        raise HTTPException(404, "No gym profile is linked to this account")
+    memberships, attendance, assignment_rows = repository.get_member_dashboard_records(
+        session,
+        member.id,
+    )
+    workouts = [
+        {"assignment": assignment, "plan": plan, "trainer": trainer}
+        for assignment, plan, trainer in assignment_rows
+    ]
+    return {
+        "member": member,
+        "memberships": memberships,
+        "attendance": attendance,
+        "workouts": workouts,
+    }
