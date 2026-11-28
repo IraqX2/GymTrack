@@ -2,7 +2,7 @@
 
 ## Architecture decision
 
-GymTrack uses a layered, MVC-style architecture. The course reference calls this style MVC; the sample repository also separates routers/controllers, services, repositories, models, schemas and shared dependencies. The implementation in GymTrack is independently written and uses the same general separation-of-concerns principles rather than reproducing the sample source.
+GymTrack uses a layered, MVC-style architecture. The frontend renders the views, FastAPI routers handle requests, services apply business rules, repositories perform database queries, and SQLModel classes define the data models.
 
 ## Request flow
 

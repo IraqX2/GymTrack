@@ -69,4 +69,4 @@ Configure DATABASE_URL, JWT_SECRET_KEY, PASSWORD_PEPPER and BOOTSTRAP_ADMIN_EMAI
 
 ## 8. Testing and limitations
 
-Run the trainer promotion, assignment filtering, cross-trainer denial, member ownership, JWT expiry/refresh, logout/revocation, group permission and hosted persistence checks on the deployed URL. The current source still needs broader automated pytest coverage and further modularization of earlier resource endpoints. See docs/REQUIREMENTS_TRACEABILITY.md for remaining rubric items.
+The main API domains are separated into router/controller, service, repository and model/schema modules. GitHub Actions runs the backend authorization/security test suite and frontend TypeScript/Vite production build. Remaining quality work is broader integration coverage and live verification of login/refresh/logout, member ownership, group permissions, trainer assignment ownership, database persistence, admin moderation and CSV exports. See docs/REQUIREMENTS_TRACEABILITY.md.
