@@ -10,7 +10,7 @@ try:
     from backend.models.trainer import Trainer
     from backend.models.user import AppUser
     from backend.models.resources import (
-        AuthSession, Membership, Attendance, GymGroup,
+        AuthSession, Membership, Attendance, GymGroup, GymGroupMember,
     )
     from backend.models.workout import WorkoutAssignment, WorkoutPlan
 except ModuleNotFoundError:
@@ -19,7 +19,7 @@ except ModuleNotFoundError:
     from models.trainer import Trainer
     from models.user import AppUser
     from models.resources import (
-        AuthSession, Membership, Attendance, GymGroup,
+        AuthSession, Membership, Attendance, GymGroup, GymGroupMember,
     )
     from models.workout import WorkoutAssignment, WorkoutPlan
 
@@ -103,9 +103,9 @@ def user_detail_records(session: Session, target: AppUser) -> dict:
             .order_by(WorkoutAssignment.created_at.desc())
         ).all()
     group_rows = session.exec(
-        select(__import__("backend.models.resources", fromlist=["GymGroupMember"]).GymGroupMember, GymGroup)
-        .join(GymGroup, GymGroup.id == __import__("backend.models.resources", fromlist=["GymGroupMember"]).GymGroupMember.group_id)
-        .where(__import__("backend.models.resources", fromlist=["GymGroupMember"]).GymGroupMember.user_id == target_id)
+        select(GymGroupMember, GymGroup)
+        .join(GymGroup, GymGroup.id == GymGroupMember.group_id)
+        .where(GymGroupMember.user_id == target_id)
     ).all()
     session_rows = list(
         session.exec(
