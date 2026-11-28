@@ -43,7 +43,7 @@ The trainer profile is linked to a login account through the existing `trainer.u
 
 ## Architecture
 
-Member, group, trainer, membership, attendance, workout-plan/assignment, authentication/profile/session and administration domains use separate router/controller modules. Business logic is in services and core database access is separated into repositories. The app entry point is limited to setup, health checks, startup and router registration. See [ARCHITECTURE.md](ARCHITECTURE.md). This is an independently implemented MVC-style/layered architecture, not copied source code from the instructor's reference.
+Member, group, trainer, membership, attendance, workout-plan/assignment, authentication/profile/session and administration domains use separate router/controller modules. Business logic is in services and core database access is separated into repositories. The app entry point is limited to setup, health checks, startup and router registration. See [ARCHITECTURE.md](ARCHITECTURE.md). The separation keeps interface code, request handling, business rules and database access in distinct modules.
 
 ## Important outstanding checks against the course brief
 
@@ -52,7 +52,7 @@ The source now implements the main admin controls that were missing in the first
 The remaining work is primarily verification and broader quality coverage:
 
 - Run end-to-end tests against Vercel + Supabase for normal member, trainer and admin accounts.
-- Verify the existing `trainer_progress` schema is present on the target database and review database grants/RLS.
+- Review database grants and Row Level Security on the target Supabase database.
 - Expand pytest coverage to login failures, refresh rotation, logout/revocation, group create/edit/assign denial, live membership persistence and full admin workflows.
 - Check moderation/export flows using representative hosted records and confirm exported data respects the active filter choices.
 - Run broader integration tests for authentication/session workflows, admin content moderation and CSV exports against the deployed database.
