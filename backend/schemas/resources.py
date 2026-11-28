@@ -1,6 +1,7 @@
 """Pydantic request schemas for GymTrack API resources."""
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field as PField
 
