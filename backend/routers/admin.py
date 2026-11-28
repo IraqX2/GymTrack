@@ -190,101 +190,76 @@ def bulk_delete_admin_content(
 
 
 @router.get("/api/admin/export/users")
-def export_users(user: ADMIN, db: DB, request: Request, q: str = "", role: str = "", status: str = ""):
-    query = select(AppUser)
-    if q:
-        query = query.where(AppUser.full_name.ilike(f"%{q}%") | AppUser.email.ilike(f"%{q}%"))
-    if role in {"admin", "user", "trainer"}:
-        query = query.where(AppUser.role == role)
-    if status == "banned":
-        query = query.where(AppUser.is_banned.is_(True))
-    if status == "active":
-        query = query.where(AppUser.is_banned.is_(False))
-    rows = db.exec(query.order_by(AppUser.id)).all()
+def export_users(
+    user: ADMIN,
+    db: DB,
+    request: Request,
+    q: str = "",
+    role: str = "",
+    status: str = "",
+):
+    result = admin_service.export_users_csv(db, q, role, status)
     audit(db, request, "data_exported", user, "export", "users")
-    return admin_service.csv_response("gymtrack-users.csv", ["id", "full_name", "email", "role", "is_banned", "created_at"],
-        [[u.id, u.full_name, u.email, u.role, u.is_banned, u.created_at.isoformat()] for u in rows])
+    return result
 
 
 @router.get("/api/admin/export/members")
-def export_members(user: ADMIN, db: DB, request: Request, q: str = "", status: str = ""):
-    query = select(Member)
-    if q:
-        query = query.where(Member.full_name.ilike(f"%{q}%") | Member.email.ilike(f"%{q}%"))
-    if status == "active":
-        query = query.where(Member.is_active.is_(True))
-    if status == "inactive":
-        query = query.where(Member.is_active.is_(False))
-    rows = db.exec(query.order_by(Member.id)).all()
+def export_members(
+    user: ADMIN,
+    db: DB,
+    request: Request,
+    q: str = "",
+    status: str = "",
+):
+    result = admin_service.export_members_csv(db, q, status)
     audit(db, request, "data_exported", user, "export", "members")
-    return admin_service.csv_response("gymtrack-members.csv", ["id", "full_name", "email", "phone", "join_date", "is_active"],
-        [[m.id, m.full_name, m.email, m.phone, m.join_date, m.is_active] for m in rows])
+    return result
 
 
 @router.get("/api/admin/export/activity")
 def export_activity(user: ADMIN, db: DB, request: Request, q: str = ""):
-    query = select(ActivityLog)
-    if q:
-        query = query.where(
-            ActivityLog.action.ilike(f"%{q}%") | ActivityLog.email.ilike(f"%{q}%")
-        )
-    rows = db.exec(query.order_by(ActivityLog.created_at.desc()).limit(10000)).all()
+    result = admin_service.export_activity_csv(db, q)
     audit(db, request, "data_exported", user, "export", "activity")
-    return admin_service.csv_response("gymtrack-activity.csv",
-        ["id", "email", "action", "entity_type", "entity_id", "ip_address", "user_agent", "created_at"],
-        [[a.id, a.email, a.action, a.entity_type, a.entity_id, a.ip_address, a.user_agent, a.created_at] for a in rows])
+    return result
 
 
 @router.get("/api/admin/export/trainers")
 def export_trainers(user: ADMIN, db: DB, request: Request):
-    rows = db.exec(select(Trainer).order_by(Trainer.full_name)).all()
+    result = admin_service.export_trainers_csv(db)
     audit(db, request, "data_exported", user, "export", "trainers")
-    return admin_service.csv_response("gymtrack-trainers.csv",
-        ["id", "full_name", "email", "phone", "specialization", "is_active"],
-        [[t.id, t.full_name, t.email, t.phone, t.specialization, t.is_active] for t in rows])
+    return result
 
 
 @router.get("/api/admin/export/memberships")
 def export_memberships(user: ADMIN, db: DB, request: Request):
-    rows = db.exec(select(Membership).order_by(Membership.created_at.desc())).all()
+    result = admin_service.export_memberships_csv(db)
     audit(db, request, "data_exported", user, "export", "memberships")
-    return admin_service.csv_response("gymtrack-memberships.csv",
-        ["id", "member_id", "plan_name", "start_date", "end_date", "price", "status"],
-        [[m.id, m.member_id, m.plan_name, m.start_date, m.end_date, m.price, m.status] for m in rows])
+    return result
 
 
 @router.get("/api/admin/export/attendance")
 def export_attendance(user: ADMIN, db: DB, request: Request):
-    rows = db.exec(select(Attendance).order_by(Attendance.check_in.desc()).limit(50000)).all()
+    result = admin_service.export_attendance_csv(db)
     audit(db, request, "data_exported", user, "export", "attendance")
-    return admin_service.csv_response("gymtrack-attendance.csv",
-        ["id", "member_id", "check_in", "check_out", "notes", "recorded_by"],
-        [[a.id, a.member_id, a.check_in, a.check_out, a.notes, a.recorded_by] for a in rows])
+    return result
 
 
 @router.get("/api/admin/export/workouts")
 def export_workouts(user: ADMIN, db: DB, request: Request):
-    rows = db.exec(select(WorkoutPlan).order_by(WorkoutPlan.created_at.desc())).all()
+    result = admin_service.export_workouts_csv(db)
     audit(db, request, "data_exported", user, "export", "workout_plans")
-    return admin_service.csv_response("gymtrack-workout-plans.csv",
-        ["id", "title", "description", "level", "duration_weeks", "created_by"],
-        [[p.id, p.title, p.description, p.level, p.duration_weeks, p.created_by] for p in rows])
+    return result
 
 
 @router.get("/api/admin/export/assignments")
 def export_workout_assignments(user: ADMIN, db: DB, request: Request):
-    rows = db.exec(select(WorkoutAssignment).order_by(WorkoutAssignment.created_at.desc())).all()
+    result = admin_service.export_assignments_csv(db)
     audit(db, request, "data_exported", user, "export", "workout_assignments")
-    return admin_service.csv_response("gymtrack-workout-assignments.csv",
-        ["id", "plan_id", "member_id", "trainer_id", "start_date", "end_date", "status"],
-        [[a.id, a.plan_id, a.member_id, a.trainer_id, a.start_date, a.end_date, a.status] for a in rows])
+    return result
 
 
 @router.get("/api/admin/export/groups")
 def export_groups(user: ADMIN, db: DB, request: Request):
-    rows = db.exec(select(GymGroup).order_by(GymGroup.created_at.desc())).all()
+    result = admin_service.export_groups_csv(db)
     audit(db, request, "data_exported", user, "export", "groups")
-    return admin_service.csv_response("gymtrack-groups.csv", ["id", "name", "created_by", "created_at"],
-        [[g.id, g.name, g.created_by, g.created_at] for g in rows])
-
-
+    return result
