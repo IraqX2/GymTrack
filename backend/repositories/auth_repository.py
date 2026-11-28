@@ -26,7 +26,10 @@ def save_user(session: Session, user: AppUser) -> AppUser:
 
 
 def add_member_profile(session: Session, user: AppUser) -> None:
-    from backend.models.member import Member
+    try:
+        from backend.models.member import Member
+    except ModuleNotFoundError:
+        from models.member import Member
     session.add(
         Member(
             full_name=user.full_name,
