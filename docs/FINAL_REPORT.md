@@ -5,7 +5,7 @@
 **Technology:** React, TypeScript, FastAPI, SQLModel, PostgreSQL/Supabase and Vercel  
 **Source repository:** https://github.com/IraqX2/GymTrack
 
-> This report describes the source implementation and its known limits. Live deployment checks, screenshots, demo credentials and the required video must be completed against the deployed version before submission. They are not fabricated in this document.
+> **Before exporting this report as the submission PDF:** add the five genuine screenshots in Section 20, paste the shareable demo-video link, and confirm the demo account roles in Section 21. Keep passwords out of this public repository.
 
 ---
 
@@ -158,7 +158,7 @@ GymTrack uses an MVC-style layered architecture. The general request path is:
 
 React page/component (View) → frontend API client → FastAPI router (Controller) → shared authentication/role dependency → domain service → repository → SQLModel data model → PostgreSQL/SQLite.
 
-Member, group and trainer domains are separated into the following layers/files:
+All application domains use separate router/controller modules, with their business rules and database access separated into service and repository layers:
 
 | Layer | File | Responsibility |
 |---|---|---|
@@ -293,24 +293,37 @@ The following tests must be run against the actual preview/production deployment
 
 The source now contains admin role/status filters and paginated user results, account detail, bulk ban/unban, a content-moderation tab with single/bulk deletion for supported record categories, filter-aware CSV exports, and failed-login summaries grouped by IP and account. Automated tests are configured in GitHub Actions; the current suite covers authorization dependency behavior, assignment ownership, token rejection, app route registration and password hashing.
 
-The following still require verification or further work: live tests against the deployed Supabase database, a review of database grants/RLS, a security review of all legacy endpoints, export and moderation behavior with representative data, test coverage for every login/refresh/logout/member/group path, and a full domain-by-domain extraction of older endpoints from `backend/gymtrack_api.py` into routers/services/repositories. The content-moderation page supports memberships, attendance, workout plans, assignments, groups and trainer progress; it is not a generic delete tool for every table.
+The remaining work is verification rather than another large code refactor: test the deployed login/refresh/logout flow, confirm member ownership and group permissions, exercise trainer assignment/progress ownership, and verify admin moderation and CSV exports using the hosted demo records. Review Supabase grants and Row Level Security before using real member data. The content-moderation page supports memberships, attendance, workout plans, assignments, groups and trainer progress; it is not a generic delete tool for every table.
 
-Do not represent CI success as proof that live deployment behavior is complete. See REQUIREMENTS_TRACEABILITY.md.
+The automated build and test checks validate the source and production bundle. Complete the live workflow checks separately and record any results in the final submission. See REQUIREMENTS_TRACEABILITY.md.
 
 ## 20. Report screenshots and video
 
-Insert genuine screenshots captured from the deployed URL for:
+Add these five screenshots from the deployed application. Replace each bracketed line with the actual screenshot:
 
-1. Normal member dashboard and personal records.
-2. Admin dashboard and account management.
-3. A protected request denied by RBAC (show status code and endpoint without exposing secrets).
-4. Expired access token and refresh/rejection behavior in browser DevTools.
-5. Activity log with sample demo events.
+1. **Member dashboard:** [Add screenshot of the normal member dashboard and personal records.]
+2. **Admin dashboard:** [Add screenshot of the admin overview and account management.]
+3. **RBAC denial:** [Add screenshot showing a normal user request denied by the admin-only API, including the endpoint and HTTP 403 status.]
+4. **Token refresh:** [Add screenshot of an expired access-token request followed by the refresh request and the renewed request.]
+5. **Activity log:** [Add screenshot of the admin activity log with demo events.]
 
-The course brief also requires a 5–8 minute screen recording with voice showing login, normal user access, a denied RBAC action, group permissions, refresh/token expiry and the admin dashboard including ban, activity and CSV export.
+**Demo video:** [Paste the shareable Google Drive link to the 5–8 minute voice recording.]
 
-Do not include real user passwords, JWTs, refresh cookies, database connection strings or other secrets in screenshots or recordings.
+The recording should show login, member access, a denied admin-only action, group permissions, token expiry/refresh, trainer progress and the admin dashboard including ban/unban, activity and CSV export.
+
+Do not include real user passwords, JWT values, refresh cookies, database connection strings or other secrets in screenshots or recordings.
 
 ## 21. Demo accounts
 
-The deployed database must contain at least two admin accounts and three normal user accounts with sample data. Add the actual account user IDs and roles to the README or final submission fields as directed, but keep passwords out of Git and the public README. Enter demo passwords only in the private submission form/report fields.
+The hosted demo database currently contains two admin accounts and four normal user accounts. Use the following IDs in the recording and private submission details:
+
+| User ID | Current role | Demo use |
+|---:|---|---|
+| 1 | Admin | Main administrator and group owner |
+| 5 | Admin | Second administrator account |
+| 2 | User/member | Normal member and group Create permission |
+| 3 | User/member | Normal member and group Edit permission |
+| 4 | User/member | Normal member and group Assign permission |
+| 6 | User/member | Promote to Trainer before the trainer demonstration |
+
+After promoting User ID 6, sign in again with that account to demonstrate the trainer workspace. Keep demo passwords out of Git and the public README; enter them only in the private submission fields.
