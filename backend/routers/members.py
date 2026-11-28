@@ -32,12 +32,12 @@ def create_member(payload: MemberCreate, user: ADMIN, db: DB, request: Request):
     return member
 
 
-@router.get("/{member_id}")
+@router.get("/api/members/{member_id}")
 def get_member(member_id: int, user: CURRENT, db: DB):
     return member_service.get_member_record(db, member_id, user)
 
 
-@router.put("/{member_id}")
+@router.put("/api/members/{member_id}")
 def update_member(
     member_id: int,
     payload: MemberUpdate,
@@ -50,7 +50,7 @@ def update_member(
     return member
 
 
-@router.delete("/{member_id}", status_code=204)
+@router.delete("/api/members/{member_id}", status_code=204)
 def delete_member(member_id: int, user: ADMIN, db: DB, request: Request):
     member_service.delete_member_record(db, member_id)
     audit(db, request, "member_deleted", user, "member", member_id)
