@@ -1,45 +1,39 @@
+"""Business rules for member CRUD and ownership."""
+
 from fastapi import HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 try:
     from backend.models.member import Member
+    from backend.repositories import member_repository as repository
     from backend.schemas.member import MemberCreate, MemberUpdate
 except ModuleNotFoundError:
     from models.member import Member
+    from repositories import member_repository as repository
     from schemas.member import MemberCreate, MemberUpdate
 
 
-def create_member_record(session: Session, payload: MemberCreate) -> Member:
-    existing = session.exec(
-        select(Member).where(Member.email == str(payload.email))
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail="A member with this email already exists.",
-        )
-
-    member = Member(**payload.model_dump())
-    session.add(member)
-    session.commit()
-    session.refresh(member)
-    return member
+def list_member_records(session: Session, account, offset: int = 0, limit: int = 50) -> list[Member]:
+    return repository.list_members(session, account, offset, limit)
 
 
-def list_member_records(session: Session, offset: int = 0, limit: int = 100) -> list[Member]:
-    statement = (
-        select(Member)
-        .order_by(Member.id.desc())
-        .offset(offset)
-        .limit(limit)
+def create_member_record(session: Session, payload: MemberCreate, created_by: int) -> Member:
+    email = str(payload.email).strip().lower()
+    if repository.find_member_by_email(session, email):
+        raise HTTPException(status_code=409, detail="Member email already exists")
+
+    member = Member(
+        **payload.model_dump(exclude={"email"}),
+        email=email,
+        created_by=created_by,
     )
-    return list(session.exec(statement).all())
+    return repository.add_member(session, member)
 
 
-def get_member_record(session: Session, member_id: int) -> Member:
-    member = session.get(Member, member_id)
-    if member is None:
-        raise HTTPException(status_code=404, detail="Member not found.")
+def get_member_record(session: Session, member_id: int, account) -> Member:
+    member = repository.find_member_by_id(session, member_id)
+    if member is None or (account.role != "admin" and member.user_id != account.id):
+        raise HTTPException(status_code=404, detail="Member not found")
     return member
 
 
@@ -48,33 +42,30 @@ def update_member_record(
     member_id: int,
     payload: MemberUpdate,
 ) -> Member:
-    member = get_member_record(session, member_id)
-    changes = payload.model_dump(exclude_unset=True)
+    member = repository.find_member_by_id(session, member_id)
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
 
-    if "email" in changes:
-        changes["email"] = str(changes["email"])
-        duplicate = session.exec(
-            select(Member).where(
-                Member.email == changes["email"],
-                Member.id != member_id,
-            )
-        ).first()
-        if duplicate:
-            raise HTTPException(
-                status_code=409,
-                detail="A member with this email already exists.",
-            )
+    changes = payload.model_dump(exclude_unset=True)
+    if "email" in changes and changes["email"] is not None:
+        email = str(changes["email"]).strip().lower()
+        duplicate = repository.find_member_by_email(session, email)
+        if duplicate and duplicate.id != member_id:
+            raise HTTPException(status_code=409, detail="Member email already exists")
+        changes["email"] = email
 
     for key, value in changes.items():
         setattr(member, key, value)
-
-    session.add(member)
-    session.commit()
-    session.refresh(member)
-    return member
+    return repository.save_member(session, member)
 
 
 def delete_member_record(session: Session, member_id: int) -> None:
-    member = get_member_record(session, member_id)
-    session.delete(member)
-    session.commit()
+    member = repository.find_member_by_id(session, member_id)
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if repository.member_has_gym_history(session, member_id):
+        raise HTTPException(
+            status_code=409,
+            detail="This member has gym history. Mark the member inactive instead of deleting their records.",
+        )
+    repository.remove_member(session, member)
