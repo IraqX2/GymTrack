@@ -118,31 +118,21 @@ The API docs page is `/api/docs` on Vercel and `/docs` locally.
 - Only group owners can rename/delete a group or manage its membership. Group create/edit/assign permissions are checked by FastAPI.
 
 
-## Demo account IDs and shared group permissions
+## Demo account setup (private submission only)
 
-The hosted demo database currently contains the following account IDs and roles. Passwords are deliberately excluded from this public repository; enter them only in the private final-submission form.
+The hosted demonstration dataset contains administrator and normal member accounts, plus a trainer workflow that is enabled by administrator promotion. Test account IDs and passwords are intentionally excluded from public repository documentation. Use the private submission PDF appendix for demo login details.
 
-| User ID | Role |
-|---:|---|
-| 1 | Admin |
-| 5 | Admin |
-| 2 | User/member |
-| 3 | User/member |
-| 4 | User/member |
-| 6 | User/member |
+The shared team demonstrates distinct member-level grants:
 
-**Shared group: Training Operations Team (Group ID 5)**
+| Group role / grant | Create tasks | Edit tasks | Assign tasks |
+|---|---:|---:|---:|
+| Group owner | Yes | Yes | Yes |
+| Create-granted member | Yes | No | No |
+| Edit-granted member | No | Yes | No |
+| Assign-granted member | No | No | Yes |
+| Member without grants | No | No | No |
 
-Owner: User ID 1 (all group permissions).
-
-| Member user ID | Create tasks | Edit tasks | Assign tasks |
-|---:|---:|---:|---:|
-| 2 | Yes | No | No |
-| 3 | No | Yes | No |
-| 4 | No | No | Yes |
-| 5 | No | No | No |
-
-The deployed demo currently has one trainer staff profile without a linked login account. For the recording, an administrator should promote User ID 6 to Trainer, assign a workout to that trainer, then sign in as User ID 6 to demonstrate the trainer dashboard. User IDs 2, 3 and 4 remain normal demo accounts.
+For the trainer walkthrough, an administrator promotes an eligible normal account to Trainer, assigns a workout plan to a member with that trainer selected, and the promoted account signs in again to open the trainer workspace.
 
 ## Known verification items
 
