@@ -384,3 +384,84 @@ def security_summary(session: Session) -> dict:
             for email, count in sorted(by_account.items(), key=lambda item: item[1], reverse=True)
         ],
     }
+
+
+def export_users_csv(session: Session, q: str = "", role: str = "", status: str = ""):
+    rows = repository.export_users(session, q, role, status)
+    return csv_response(
+        "gymtrack-users.csv",
+        ["id", "full_name", "email", "role", "is_banned", "created_at"],
+        [[u.id, u.full_name, u.email, u.role, u.is_banned, u.created_at.isoformat()] for u in rows],
+    )
+
+
+def export_members_csv(session: Session, q: str = "", status: str = ""):
+    rows = repository.export_members(session, q, status)
+    return csv_response(
+        "gymtrack-members.csv",
+        ["id", "full_name", "email", "phone", "join_date", "is_active"],
+        [[m.id, m.full_name, m.email, m.phone, m.join_date, m.is_active] for m in rows],
+    )
+
+
+def export_activity_csv(session: Session, q: str = ""):
+    rows = repository.export_activity(session, q)
+    return csv_response(
+        "gymtrack-activity.csv",
+        ["id", "email", "action", "entity_type", "entity_id", "ip_address", "user_agent", "created_at"],
+        [[a.id, a.email, a.action, a.entity_type, a.entity_id, a.ip_address, a.user_agent, a.created_at] for a in rows],
+    )
+
+
+def export_trainers_csv(session: Session):
+    rows = repository.export_trainers(session)
+    return csv_response(
+        "gymtrack-trainers.csv",
+        ["id", "full_name", "email", "phone", "specialization", "is_active"],
+        [[t.id, t.full_name, t.email, t.phone, t.specialization, t.is_active] for t in rows],
+    )
+
+
+def export_memberships_csv(session: Session):
+    rows = repository.export_memberships(session)
+    return csv_response(
+        "gymtrack-memberships.csv",
+        ["id", "member_id", "plan_name", "start_date", "end_date", "price", "status"],
+        [[m.id, m.member_id, m.plan_name, m.start_date, m.end_date, m.price, m.status] for m in rows],
+    )
+
+
+def export_attendance_csv(session: Session):
+    rows = repository.export_attendance(session)
+    return csv_response(
+        "gymtrack-attendance.csv",
+        ["id", "member_id", "check_in", "check_out", "notes", "recorded_by"],
+        [[a.id, a.member_id, a.check_in, a.check_out, a.notes, a.recorded_by] for a in rows],
+    )
+
+
+def export_workouts_csv(session: Session):
+    rows = repository.export_workouts(session)
+    return csv_response(
+        "gymtrack-workout-plans.csv",
+        ["id", "title", "description", "level", "duration_weeks", "created_by"],
+        [[p.id, p.title, p.description, p.level, p.duration_weeks, p.created_by] for p in rows],
+    )
+
+
+def export_assignments_csv(session: Session):
+    rows = repository.export_assignments(session)
+    return csv_response(
+        "gymtrack-workout-assignments.csv",
+        ["id", "plan_id", "member_id", "trainer_id", "start_date", "end_date", "status"],
+        [[a.id, a.plan_id, a.member_id, a.trainer_id, a.start_date, a.end_date, a.status] for a in rows],
+    )
+
+
+def export_groups_csv(session: Session):
+    rows = repository.export_groups(session)
+    return csv_response(
+        "gymtrack-groups.csv",
+        ["id", "name", "created_by", "created_at"],
+        [[g.id, g.name, g.created_by, g.created_at] for g in rows],
+    )
