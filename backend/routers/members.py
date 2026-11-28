@@ -1,69 +1,57 @@
-from fastapi import APIRouter, Depends, Query, Response
-from sqlmodel import Session
+from fastapi import APIRouter, Query, Request, Response
 
 try:
-    from backend.database import get_session
-    from backend.schemas.member import MemberCreate, MemberRead, MemberUpdate
-    from backend.services.member_service import (
-        create_member_record,
-        delete_member_record,
-        get_member_record,
-        list_member_records,
-        update_member_record,
-    )
+    from backend.core.audit import audit
+    from backend.core.dependencies import ADMIN, CURRENT, DB
+    from backend.schemas.member import MemberCreate, MemberUpdate
+    from backend.services import member_service
 except ModuleNotFoundError:
-    from database import get_session
-    from schemas.member import MemberCreate, MemberRead, MemberUpdate
-    from services.member_service import (
-        create_member_record,
-        delete_member_record,
-        get_member_record,
-        list_member_records,
-        update_member_record,
-    )
+    from core.audit import audit
+    from core.dependencies import ADMIN, CURRENT, DB
+    from schemas.member import MemberCreate, MemberUpdate
+    from services import member_service
 
 
 router = APIRouter(prefix="/api/members", tags=["members"])
 
 
-@router.post("", response_model=MemberRead, status_code=201)
-def create_member(
-    payload: MemberCreate,
-    session: Session = Depends(get_session),
-):
-    return create_member_record(session, payload)
-
-
-@router.get("", response_model=list[MemberRead])
+@router.get("")
 def list_members(
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=100),
-    session: Session = Depends(get_session),
+    user: CURRENT,
+    db: DB,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
 ):
-    return list_member_records(session, offset=offset, limit=limit)
+    return member_service.list_member_records(db, user, offset=offset, limit=limit)
 
 
-@router.get("/{member_id}", response_model=MemberRead)
-def get_member(
-    member_id: int,
-    session: Session = Depends(get_session),
-):
-    return get_member_record(session, member_id)
+@router.post("", status_code=201)
+def create_member(payload: MemberCreate, user: ADMIN, db: DB, request: Request):
+    member = member_service.create_member_record(db, payload, created_by=user.id)
+    audit(db, request, "member_created", user, "member", member.id)
+    return member
 
 
-@router.put("/{member_id}", response_model=MemberRead)
+@router.get("/{member_id}")
+def get_member(member_id: int, user: CURRENT, db: DB):
+    return member_service.get_member_record(db, member_id, user)
+
+
+@router.put("/{member_id}")
 def update_member(
     member_id: int,
     payload: MemberUpdate,
-    session: Session = Depends(get_session),
+    user: ADMIN,
+    db: DB,
+    request: Request,
 ):
-    return update_member_record(session, member_id, payload)
+    member = member_service.update_member_record(db, member_id, payload)
+    audit(db, request, "member_updated", user, "member", member.id)
+    return member
 
 
 @router.delete("/{member_id}", status_code=204)
-def delete_member(
-    member_id: int,
-    session: Session = Depends(get_session),
-):
-    delete_member_record(session, member_id)
+def delete_member(member_id: int, user: ADMIN, db: DB, request: Request):
+    member_service.delete_member_record(db, member_id)
+    audit(db, request, "member_deleted", user, "member", member_id)
     return Response(status_code=204)

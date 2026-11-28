@@ -5,7 +5,7 @@
 **Technology:** React, TypeScript, FastAPI, SQLModel, PostgreSQL/Supabase and Vercel  
 **Source repository:** https://github.com/IraqX2/GymTrack
 
-> This report describes the source implementation on the feature branch. Live deployment checks, screenshots, demo credentials and the required video must be completed against the deployed version before submission. They are not fabricated in this document.
+> This report describes the source implementation and its known limits. Live deployment checks, screenshots, demo credentials and the required video must be completed against the deployed version before submission. They are not fabricated in this document.
 
 ---
 
@@ -158,7 +158,7 @@ GymTrack uses an MVC-style layered architecture. The general request path is:
 
 React page/component (View) → frontend API client → FastAPI router (Controller) → shared authentication/role dependency → domain service → repository → SQLModel data model → PostgreSQL/SQLite.
 
-The trainer feature is separated into the following files:
+Member, group and trainer domains are separated into the following layers/files:
 
 | Layer | File | Responsibility |
 |---|---|---|
@@ -173,7 +173,7 @@ The trainer feature is separated into the following files:
 | Audit | backend/core/audit.py | Activity event recording |
 | View | frontend/src/pages/TrainerDashboard.tsx | Trainer interface |
 
-Some earlier member, attendance, membership, workout and group endpoints are still concentrated in backend/gymtrack_api.py. This feature change does not claim that the entire legacy API has already been migrated. The remaining endpoint-by-endpoint refactor is recorded as technical debt in ARCHITECTURE.md.
+Membership, attendance, authentication/profile, workout-plan/assignment and admin endpoint handlers still remain in backend/gymtrack_api.py. This report does not claim that the entire legacy API has been migrated. The remaining endpoint-by-endpoint refactor is recorded as technical debt in ARCHITECTURE.md.
 
 ## 12. Database design
 

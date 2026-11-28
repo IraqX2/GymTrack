@@ -17,8 +17,18 @@ try:
     from backend.models.trainer_progress import WorkoutProgress
     from backend.models.user import AppUser
     from backend.models.activity import ActivityLog
+    from backend.models.resources import (
+        AuthSession, Membership, Attendance, AttendanceRequest,
+        GymGroup, GymGroupMember, GymGroupTask,
+    )
     from backend.schemas.trainer import RoleChangeBody
     from backend.schemas.admin import BulkUserAction, BulkContentDelete
+    from backend.schemas.resources import (
+        Signup, Login, ProfilePatch, PasswordPatch, MemberBody,
+        MembershipBody, AttendanceBody, AttendanceRequestBody,
+        AttendanceRequestReview, PlanBody, AssignmentBody, GroupBody,
+        GroupMemberBody, GroupPermissions, GroupWorkBody, GroupWorkPatch,
+    )
     from backend.core.audit import audit, client_ip
     from backend.core.dependencies import ADMIN, CURRENT, DB, TRAINER
 except ModuleNotFoundError:
@@ -29,193 +39,22 @@ except ModuleNotFoundError:
     from models.trainer_progress import WorkoutProgress
     from models.user import AppUser
     from models.activity import ActivityLog
+    from models.resources import (
+        AuthSession, Membership, Attendance, AttendanceRequest,
+        GymGroup, GymGroupMember, GymGroupTask,
+    )
     from schemas.trainer import RoleChangeBody
     from schemas.admin import BulkUserAction, BulkContentDelete
+    from schemas.resources import (
+        Signup, Login, ProfilePatch, PasswordPatch, MemberBody,
+        MembershipBody, AttendanceBody, AttendanceRequestBody,
+        AttendanceRequestReview, PlanBody, AssignmentBody, GroupBody,
+        GroupMemberBody, GroupPermissions, GroupWorkBody, GroupWorkPatch,
+    )
     from core.audit import audit, client_ip
     from core.dependencies import ADMIN, CURRENT, DB, TRAINER
 
 
-
-
-class AuthSession(SQLModel, table=True):
-    __tablename__ = "authsession"
-    id: str = Field(primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
-    refresh_token_hash: str = Field(unique=True, index=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_used_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: datetime
-    revoked_at: datetime | None = None
-    ip_address: str | None = None
-    user_agent: str | None = None
-
-
-
-
-class Membership(SQLModel, table=True):
-    __tablename__ = "membership"
-    id: int | None = Field(default=None, primary_key=True)
-    member_id: int = Field(foreign_key="member.id", index=True)
-    plan_name: str
-    start_date: date = Field(default_factory=date.today)
-    end_date: date
-    price: float = 0
-    status: str = "active"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class Attendance(SQLModel, table=True):
-    __tablename__ = "attendance"
-    id: int | None = Field(default=None, primary_key=True)
-    member_id: int = Field(foreign_key="member.id", index=True)
-    check_in: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    check_out: datetime | None = None
-    notes: str = ""
-    recorded_by: int | None = Field(default=None, foreign_key="user.id")
-
-
-class AttendanceRequest(SQLModel, table=True):
-    __tablename__ = "attendance_request"
-    id: int | None = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
-    member_id: int = Field(foreign_key="member.id", index=True)
-    requested_check_in: datetime
-    requested_check_out: datetime | None = None
-    notes: str = ""
-    status: str = "pending"
-    reviewed_by: int | None = Field(default=None, foreign_key="user.id")
-    reviewed_at: datetime | None = None
-    review_note: str = ""
-    attendance_id: int | None = Field(default=None, foreign_key="attendance.id", unique=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-
-
-class GymGroup(SQLModel, table=True):
-    __tablename__ = "gym_group"
-    id: int | None = Field(default=None, primary_key=True)
-    name: str
-    created_by: int = Field(foreign_key="user.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class GymGroupMember(SQLModel, table=True):
-    __tablename__ = "gym_group_member"
-    group_id: int = Field(foreign_key="gym_group.id", primary_key=True)
-    user_id: int = Field(foreign_key="user.id", primary_key=True)
-    role: str = "member"
-    can_create: bool = False
-    can_edit: bool = False
-    can_assign: bool = False
-    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class GymGroupTask(SQLModel, table=True):
-    __tablename__ = "gym_group_task"
-    id: int | None = Field(default=None, primary_key=True)
-    group_id: int = Field(foreign_key="gym_group.id", index=True)
-    title: str
-    description: str = ""
-    due_date: date | None = None
-    assigned_to: int | None = Field(default=None, foreign_key="user.id")
-    created_by: int = Field(foreign_key="user.id")
-    is_completed: bool = False
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-
-
-# Request/response schemas.
-class Signup(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-    email: EmailStr
-    password: str = PField(min_length=8, max_length=128)
-
-class Login(BaseModel):
-    email: EmailStr
-    password: str = PField(min_length=1, max_length=128)
-
-class ProfilePatch(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-
-class PasswordPatch(BaseModel):
-    current_password: str
-    new_password: str = PField(min_length=8, max_length=128)
-
-class MemberBody(BaseModel):
-    full_name: str = PField(min_length=2, max_length=100)
-    email: EmailStr
-    phone: str = PField(default="", max_length=30)
-    join_date: date = Field(default_factory=date.today)
-    is_active: bool = True
-
-
-
-class MembershipBody(BaseModel):
-    member_id: int
-    plan_name: str = PField(min_length=2, max_length=100)
-    start_date: date = Field(default_factory=date.today)
-    end_date: date
-    price: float = PField(default=0, ge=0)
-    status: str = "active"
-
-class AttendanceBody(BaseModel):
-    member_id: int
-    check_in: datetime | None = None
-    check_out: datetime | None = None
-    notes: str = PField(default="", max_length=500)
-
-class AttendanceRequestBody(BaseModel):
-    requested_check_in: datetime
-    requested_check_out: datetime | None = None
-    notes: str = PField(default="", max_length=500)
-
-class AttendanceRequestReview(BaseModel):
-    status: Literal["approved", "rejected"]
-    review_note: str = PField(default="", max_length=500)
-
-class PlanBody(BaseModel):
-    title: str = PField(min_length=2, max_length=120)
-    description: str = ""
-    level: str = "beginner"
-    duration_weeks: int = PField(default=4, ge=1, le=52)
-
-class AssignmentBody(BaseModel):
-    plan_id: int
-    member_id: int
-    trainer_id: int | None = None
-    start_date: date = Field(default_factory=date.today)
-    end_date: date | None = None
-    status: str = "active"
-
-class GroupBody(BaseModel):
-    name: str = PField(min_length=2, max_length=100)
-
-class GroupMemberBody(BaseModel):
-    email: EmailStr
-    can_create: bool = False
-    can_edit: bool = False
-    can_assign: bool = False
-
-class GroupPermissions(BaseModel):
-    can_create: bool = False
-    can_edit: bool = False
-    can_assign: bool = False
-
-class GroupWorkBody(BaseModel):
-    title: str = PField(min_length=2, max_length=140)
-    description: str = ""
-    due_date: date | None = None
-    assigned_to: int | None = None
-
-class GroupWorkPatch(BaseModel):
-    title: str | None = PField(default=None, min_length=2, max_length=140)
-    description: str | None = None
-    due_date: date | None = None
-    assigned_to: int | None = None
-    is_completed: bool | None = None
 
 
 # App setup. In production the frontend and API share one Vercel origin.
@@ -281,19 +120,6 @@ def get_member(db: Session, member_id: int):
     if not row:
         raise HTTPException(404, "Member not found")
     return row
-
-def get_group_member(db: Session, group_id: int, user_id: int):
-    row = db.get(GymGroupMember, (group_id, user_id))
-    if not row:
-        raise HTTPException(404, "Group not found")
-    return row
-
-def group_allow(row: GymGroupMember, permission: str):
-    if row.role == "owner":
-        return
-    enabled = {"create": row.can_create, "edit": row.can_edit, "assign": row.can_assign}.get(permission, False)
-    if not enabled:
-        raise HTTPException(403, f"Group permission denied: {permission}")
 
 def csv_response(filename: str, headers: list[str], rows: list[list]):
     output = io.StringIO()
@@ -511,62 +337,6 @@ def member_dashboard(user: CURRENT, db: DB):
         "attendance": my_attendance,
         "workouts": workouts,
     }
-
-
-# Members
-@app.get("/api/members")
-def members(user: CURRENT, db: DB, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
-    query = select(Member).order_by(Member.id.desc()).offset(offset).limit(limit)
-    if user.role != "admin": query = query.where(Member.user_id == user.id)
-    return db.exec(query).all()
-
-
-@app.post("/api/members", status_code=201)
-def add_member(data: MemberBody, user: ADMIN, db: DB, request: Request):
-    email = str(data.email).lower()
-    if db.exec(select(Member).where(Member.email == email)).first():
-        raise HTTPException(409, "Member email already exists")
-    row = Member(**data.model_dump(exclude={"email"}), email=email, created_by=user.id)
-    db.add(row); db.commit(); db.refresh(row); audit(db, request, "member_created", user, "member", row.id)
-    return row
-
-
-@app.get("/api/members/{member_id}")
-def member_detail(member_id: int, user: CURRENT, db: DB):
-    row = db.get(Member, member_id)
-    if not row or (user.role != "admin" and row.user_id != user.id):
-        raise HTTPException(404, "Member not found")
-    return row
-
-
-@app.put("/api/members/{member_id}")
-def edit_member(member_id: int, data: MemberBody, user: ADMIN, db: DB, request: Request):
-    row = db.get(Member, member_id)
-    if not row: raise HTTPException(404, "Member not found")
-    for key, value in data.model_dump().items(): setattr(row, key, str(value).lower() if key == "email" else value)
-    db.add(row); db.commit(); audit(db, request, "member_updated", user, "member", row.id)
-    return row
-
-
-@app.delete("/api/members/{member_id}", status_code=204)
-def remove_member(member_id: int, user: ADMIN, db: DB, request: Request):
-    row = db.get(Member, member_id)
-    if not row:
-        raise HTTPException(404, "Member not found")
-    has_membership = db.exec(select(Membership).where(Membership.member_id == member_id)).first()
-    has_attendance = db.exec(select(Attendance).where(Attendance.member_id == member_id)).first()
-    has_workout = db.exec(select(WorkoutAssignment).where(WorkoutAssignment.member_id == member_id)).first()
-    if has_membership or has_attendance or has_workout:
-        raise HTTPException(
-            409,
-            "This member has gym history. Mark the member inactive instead of deleting their records.",
-        )
-    db.delete(row)
-    db.commit()
-    audit(db, request, "member_deleted", user, "member", member_id)
-    return Response(status_code=204)
-
-
 
 
 # Memberships
@@ -915,148 +685,6 @@ def remove_workout_assignment(assignment_id: int, user: ADMIN, db: DB, request: 
     row = db.get(WorkoutAssignment, assignment_id)
     if not row: raise HTTPException(404, "Assignment not found")
     db.delete(row); db.commit(); audit(db, request, "workout_assignment_deleted", user, "workout_assignment", assignment_id)
-    return Response(status_code=204)
-
-
-# Shared groups with server-side create/edit/assign checks. Only owners manage membership and delete.
-@app.get("/api/groups")
-def list_groups(user: CURRENT, db: DB):
-    ids = select(GymGroupMember.group_id).where(GymGroupMember.user_id == user.id)
-    rows = db.exec(select(GymGroup).where(GymGroup.id.in_(ids))).all()
-    return [{"id": g.id, "name": g.name, "created_by": g.created_by,
-             "my_role": get_group_member(db, g.id, user.id).role} for g in rows]
-
-
-@app.post("/api/groups", status_code=201)
-def create_group(data: GroupBody, user: ADMIN, db: DB, request: Request):
-    row = GymGroup(name=data.name, created_by=user.id)
-    db.add(row); db.commit(); db.refresh(row)
-    db.add(GymGroupMember(group_id=row.id, user_id=user.id, role="owner", can_create=True, can_edit=True, can_assign=True))
-    db.commit(); audit(db, request, "group_created", user, "group", row.id)
-    return {"id": row.id, "name": row.name, "my_role": "owner"}
-
-
-@app.patch("/api/groups/{group_id}")
-def rename_group(group_id: int, data: GroupBody, user: CURRENT, db: DB, request: Request):
-    membership = get_group_member(db, group_id, user.id)
-    if membership.role != "owner":
-        raise HTTPException(403, "Only the group owner can rename this group")
-    group = db.get(GymGroup, group_id)
-    if not group:
-        raise HTTPException(404, "Group not found")
-    group.name = data.name.strip()
-    db.add(group)
-    db.commit()
-    audit(db, request, "group_renamed", user, "group", group_id, group.name)
-    return {"id": group.id, "name": group.name, "my_role": membership.role}
-
-
-@app.delete("/api/groups/{group_id}", status_code=204)
-def delete_group(group_id: int, user: CURRENT, db: DB, request: Request):
-    membership = get_group_member(db, group_id, user.id)
-    if membership.role != "owner":
-        raise HTTPException(403, "Only the group owner can delete this group")
-    group = db.get(GymGroup, group_id)
-    if not group:
-        raise HTTPException(404, "Group not found")
-    for task in db.exec(select(GymGroupTask).where(GymGroupTask.group_id == group_id)).all():
-        db.delete(task)
-    for group_member in db.exec(select(GymGroupMember).where(GymGroupMember.group_id == group_id)).all():
-        db.delete(group_member)
-    db.delete(group)
-    db.commit()
-    audit(db, request, "group_deleted", user, "group", group_id, group.name)
-    return Response(status_code=204)
-
-
-@app.get("/api/groups/{group_id}/members")
-def group_members(group_id: int, user: CURRENT, db: DB):
-    get_group_member(db, group_id, user.id)
-    rows = db.exec(select(GymGroupMember, AppUser).join(AppUser, AppUser.id == GymGroupMember.user_id)
-                   .where(GymGroupMember.group_id == group_id)).all()
-    return [{"user_id": m.user_id, "full_name": u.full_name, "email": u.email, "role": m.role,
-             "can_create": m.can_create, "can_edit": m.can_edit, "can_assign": m.can_assign} for m, u in rows]
-
-
-@app.post("/api/groups/{group_id}/members", status_code=201)
-def add_group_member(group_id: int, data: GroupMemberBody, user: CURRENT, db: DB, request: Request):
-    owner = get_group_member(db, group_id, user.id)
-    if owner.role != "owner": raise HTTPException(403, "Only the group owner can add members")
-    target = db.exec(select(AppUser).where(AppUser.email == str(data.email).lower())).first()
-    if not target: raise HTTPException(404, "No GymTrack account exists for this email")
-    if db.get(GymGroupMember, (group_id, target.id)): raise HTTPException(409, "Already a group member")
-    row = GymGroupMember(group_id=group_id, user_id=target.id, role="member",
-                         can_create=data.can_create, can_edit=data.can_edit, can_assign=data.can_assign)
-    db.add(row); db.commit(); audit(db, request, "group_member_added", user, "group", group_id, target.email)
-    return {"user_id": target.id, "full_name": target.full_name, "email": target.email, "role": "member",
-            "can_create": row.can_create, "can_edit": row.can_edit, "can_assign": row.can_assign}
-
-
-@app.patch("/api/groups/{group_id}/members/{target_id}")
-def group_permissions(group_id: int, target_id: int, data: GroupPermissions,
-                      user: CURRENT, db: DB, request: Request):
-    owner = get_group_member(db, group_id, user.id)
-    if owner.role != "owner": raise HTTPException(403, "Only the group owner manages permissions")
-    target = get_group_member(db, group_id, target_id)
-    if target.role == "owner": raise HTTPException(400, "Owner permissions cannot be changed")
-    for key, value in data.model_dump().items(): setattr(target, key, value)
-    db.add(target); db.commit(); audit(db, request, "group_permissions_changed", user, "group", group_id)
-    return {"user_id": target_id, **data.model_dump()}
-
-
-@app.delete("/api/groups/{group_id}/members/{target_id}", status_code=204)
-def remove_group_member(group_id: int, target_id: int, user: CURRENT, db: DB, request: Request):
-    actor = get_group_member(db, group_id, user.id)
-    target = get_group_member(db, group_id, target_id)
-    if actor.role != "owner" and target_id != user.id: raise HTTPException(403, "Only owner can remove others")
-    if target.role == "owner": raise HTTPException(400, "Owner cannot leave; delete the group instead")
-    db.delete(target); db.commit(); audit(db, request, "group_member_removed", user, "group", group_id, str(target_id))
-    return Response(status_code=204)
-
-
-@app.get("/api/groups/{group_id}/work")
-def list_group_work(group_id: int, user: CURRENT, db: DB):
-    get_group_member(db, group_id, user.id)
-    return db.exec(select(GymGroupTask).where(GymGroupTask.group_id == group_id)
-                   .order_by(GymGroupTask.created_at.desc())).all()
-
-
-@app.post("/api/groups/{group_id}/work", status_code=201)
-def create_group_work(group_id: int, data: GroupWorkBody, user: CURRENT, db: DB, request: Request):
-    member = get_group_member(db, group_id, user.id); group_allow(member, "create")
-    if data.assigned_to is not None:
-        group_allow(member, "assign")
-        if not db.get(GymGroupMember, (group_id, data.assigned_to)): raise HTTPException(422, "Assignee is not a group member")
-    row = GymGroupTask(**data.model_dump(), group_id=group_id, created_by=user.id)
-    db.add(row); db.commit(); db.refresh(row); audit(db, request, "group_work_created", user, "group_work", row.id)
-    return row
-
-
-@app.patch("/api/groups/{group_id}/work/{work_id}")
-def edit_group_work(group_id: int, work_id: int, data: GroupWorkPatch,
-                    user: CURRENT, db: DB, request: Request):
-    member = get_group_member(db, group_id, user.id)
-    row = db.get(GymGroupTask, work_id)
-    if not row or row.group_id != group_id: raise HTTPException(404, "Group work not found")
-    changes = data.model_dump(exclude_unset=True)
-    if "assigned_to" in changes:
-        group_allow(member, "assign")
-        if changes["assigned_to"] is not None and not db.get(GymGroupMember, (group_id, changes["assigned_to"])):
-            raise HTTPException(422, "Assignee is not a group member")
-    if member.role != "owner" and row.created_by != user.id: group_allow(member, "edit")
-    for key, value in changes.items(): setattr(row, key, value)
-    row.updated_at = now(); db.add(row); db.commit()
-    audit(db, request, "group_work_updated", user, "group_work", row.id)
-    return row
-
-
-@app.delete("/api/groups/{group_id}/work/{work_id}", status_code=204)
-def delete_group_work(group_id: int, work_id: int, user: CURRENT, db: DB, request: Request):
-    member = get_group_member(db, group_id, user.id)
-    if member.role != "owner": raise HTTPException(403, "Only owner can delete group work")
-    row = db.get(GymGroupTask, work_id)
-    if not row or row.group_id != group_id: raise HTTPException(404, "Group work not found")
-    db.delete(row); db.commit(); audit(db, request, "group_work_deleted", user, "group_work", work_id)
     return Response(status_code=204)
 
 
@@ -1645,10 +1273,16 @@ def startup():
 
 try:
     from backend.routers.trainers import router as trainers_router
+    from backend.routers.members import router as members_router
+    from backend.routers.groups import router as groups_router
 except ModuleNotFoundError:
     from routers.trainers import router as trainers_router
+    from routers.members import router as members_router
+    from routers.groups import router as groups_router
 
 app.include_router(trainers_router)
+app.include_router(members_router)
+app.include_router(groups_router)
 
 
 @app.get("/")

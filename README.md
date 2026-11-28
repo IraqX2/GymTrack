@@ -28,17 +28,17 @@ GymTrack is a gym-management application for members, trainers, memberships, att
 GymTrack/
 ├── frontend/       React + TypeScript UI
 ├── backend/
-│   ├── core/       Shared authentication dependencies and audit logging
-│   ├── models/     SQLModel data models
-│   ├── schemas/    Validated API request schemas
-│   ├── repositories/ Database queries
-│   ├── services/  Domain/business rules
-│   ├── routers/   FastAPI route handlers
+│   ├── core/        Shared authentication dependencies and audit logging
+│   ├── models/      SQLModel data models, including shared resources
+│   ├── schemas/     Validated API request schemas
+│   ├── repositories/ Database queries for members, groups and trainers
+│   ├── services/   Domain/business rules for members, groups and trainers
+│   ├── routers/    FastAPI controllers for members, groups and trainers
 ├── docs/           Requirements, design and final report
 └── vercel.json
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request flow and trainer feature layers. Older gym-management endpoints remain in the original API module and are identified as refactoring work in the traceability document.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request flow and MVC-style domain layers. Member, group and trainer routes use dedicated routers, services and repositories. Authentication, attendance, membership, workout-plan/assignment and admin endpoints still have legacy handlers in `backend/gymtrack_api.py`; these are identified as remaining refactoring work.
 
 ## Run locally
 

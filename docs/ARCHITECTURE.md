@@ -29,20 +29,25 @@ Repository (database queries)
 SQLModel (Model) -> PostgreSQL / SQLite
 ```
 
-## Trainer feature structure
+## Domain layer structure
 
-| Layer | File | Responsibility |
+| Domain/layer | File | Responsibility |
 |---|---|---|
-| Model | `backend/models/trainer.py` | Gym trainer profile |
-| Model | `backend/models/workout.py` | Workout plans and assignments |
-| Model | `backend/models/trainer_progress.py` maps the existing `public.trainer_progress` table. | Trainer progress records |
-| Schema | `backend/schemas/trainer.py` | Validated request bodies and role values |
-| Repository | `backend/repositories/trainer_repository.py` | Database reads and writes |
-| Service | `backend/services/trainer_service.py` | Promotion, assignment ownership, progress business rules |
-| Router | `backend/routers/trainers.py` | HTTP endpoints and response codes |
-| Shared dependency | `backend/core/dependencies.py` | Current-user, admin and trainer authorization |
+| Models | `backend/models/member.py`, `backend/models/trainer.py`, `backend/models/workout.py`, `backend/models/trainer_progress.py` | Member, trainer, workout and progress data |
+| Shared models | `backend/models/resources.py` | Auth sessions, memberships, attendance and groups |
+| Shared schemas | `backend/schemas/resources.py` | Authentication, membership, attendance, workout and group request validation |
+| Member repository | `backend/repositories/member_repository.py` | Member queries and persistence |
+| Member service | `backend/services/member_service.py` | Member CRUD, ownership checks and history safeguards |
+| Member router | `backend/routers/members.py` | Member HTTP endpoints and role dependencies |
+| Group repository | `backend/repositories/group_repository.py` | Group, membership and task queries |
+| Group service | `backend/services/group_service.py` | Ownership and create/edit/assign permission rules |
+| Group router | `backend/routers/groups.py` | Group, membership and group-work endpoints |
+| Trainer repository | `backend/repositories/trainer_repository.py` | Trainer and assignment queries |
+| Trainer service | `backend/services/trainer_service.py` | Promotion, assignment ownership and progress rules |
+| Trainer router | `backend/routers/trainers.py` | Trainer management and workspace endpoints |
+| Shared dependencies | `backend/core/dependencies.py` | Current-user, admin and trainer authorization |
 | Shared audit | `backend/core/audit.py` | Audit events with request metadata |
-| View | `frontend/src/pages/TrainerDashboard.tsx` | Assigned members/workouts and progress form |
+| Views | `frontend/src/pages/TrainerDashboard.tsx`, `frontend/src/App.tsx` | Trainer and member/admin interfaces |
 | API client | `frontend/src/services/gymtrack.ts` | Authenticated API calls and refresh behavior |
 
 ## Role model
@@ -59,6 +64,4 @@ The API resolves the signed-in account from the access token and reloads the acc
 
 ## Scope of the refactor
 
-The new trainer feature is separated into router, service, repository, schema and model layers. Shared authentication and audit code have also been extracted from the original API module into `backend/core`.
-
-Some pre-existing member, attendance, membership, workout and group endpoints remain in `backend/gymtrack_api.py`. They were retained during this feature change to avoid a broad rewrite of working workflows immediately before the submission deadline. The next maintainability step is to migrate each existing domain into the same router/service/repository structure. The frontend's original app shell also still hosts several older page components; the trainer dashboard is a dedicated page module.
+Member, group and trainer domains now have dedicated router/controller, service, repository, schema and model layers. Shared resource table models and request schemas have also been moved out of the monolithic API module. The remaining authentication/profile, attendance, membership, workout-plan/assignment and admin endpoint handlers still live in `backend/gymtrack_api.py`; they are the next domain-by-domain refactoring work. This is a partial migration of the legacy API, not a claim that every endpoint is already modular.
