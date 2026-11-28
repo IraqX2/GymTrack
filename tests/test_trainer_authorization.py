@@ -176,6 +176,13 @@ def test_application_registers_trainer_routes():
     assert "/api/members/{member_id}" in paths
     assert "/api/groups" in paths
     assert "/api/groups/{group_id}/work" in paths
+    assert "/api/memberships" in paths
+    assert "/api/memberships/{membership_id}" in paths
+    assert "/api/attendance" in paths
+    assert "/api/attendance/requests" in paths
+    assert "/api/attendance/requests/{request_id}" in paths
+    assert "/api/workout-plans" in paths
+    assert "/api/workout-assignments" in paths
     assert "/api/trainer/assignments/{assignment_id}/progress" in paths
     assert "/api/admin/users/{target_id}" in paths
     assert "/api/admin/users/bulk-ban" in paths
