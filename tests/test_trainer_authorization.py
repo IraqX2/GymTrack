@@ -88,6 +88,38 @@ def test_trainer_can_record_progress_for_owned_assignment(monkeypatch):
     assert result.member_id == assignment.member_id
     assert result.completion_percent == 75
 
+
+def test_trainer_progress_route_audits_completion_percent(monkeypatch):
+    from backend.routers import trainers as trainer_router
+
+    trainer = SimpleNamespace(id=12, role="trainer")
+    progress = SimpleNamespace(completion_percent=80)
+    audit_events = []
+
+    monkeypatch.setattr(
+        trainer_service,
+        "record_assignment_progress",
+        lambda session, account, assignment_id, payload: progress,
+    )
+    monkeypatch.setattr(
+        trainer_router,
+        "audit",
+        lambda *args, **kwargs: audit_events.append((args, kwargs)),
+    )
+
+    result = trainer_router.add_assignment_progress(
+        assignment_id=44,
+        payload=SimpleNamespace(completion_percent=80, notes=""),
+        user=trainer,
+        db=object(),
+        request=object(),
+    )
+
+    assert result is progress
+    assert audit_events
+    assert audit_events[0][0][6] == "completion_percent=80"
+
+
 def test_access_token_verification_rejects_tampered_token():
     from backend.core.dependencies import current_user
 
@@ -124,7 +156,6 @@ def test_password_is_hashed_and_can_be_verified():
     assert password_hash != plain_password
     assert check_password(plain_password, password_hash)
     assert not check_password("incorrect-password", password_hash)
-
 
 
 def test_trainer_progress_schema_enforces_percentage_range():
