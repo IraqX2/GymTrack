@@ -15,7 +15,7 @@ except ModuleNotFoundError:
 router = APIRouter(tags=["members"])
 
 
-@router.get("")
+@router.get("/api/members")
 def list_members(
     user: CURRENT,
     db: DB,
@@ -25,7 +25,7 @@ def list_members(
     return member_service.list_member_records(db, user, offset=offset, limit=limit)
 
 
-@router.post("", status_code=201)
+@router.post("/api/members", status_code=201)
 def create_member(payload: MemberCreate, user: ADMIN, db: DB, request: Request):
     member = member_service.create_member_record(db, payload, created_by=user.id)
     audit(db, request, "member_created", user, "member", member.id)
