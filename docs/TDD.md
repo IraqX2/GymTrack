@@ -10,7 +10,7 @@ GymTrack is a React/TypeScript frontend with a FastAPI backend and SQLModel pers
 
 ## 2. Layered request design
 
-The trainer feature follows an MVC-style layered architecture:
+The member, group and trainer domains follow an MVC-style layered architecture:
 
 1. React page displays the data and gathers user input.
 2. The shared frontend API client sends an authenticated HTTP request.
@@ -20,23 +20,20 @@ The trainer feature follows an MVC-style layered architecture:
 6. A repository performs SQLModel queries and persistence.
 7. SQLModel maps data to relational tables.
 
-## 3. Trainer implementation files
+## 3. Implemented domain modules
 
-| File | Responsibility |
-|---|---|
-| backend/models/trainer.py | Trainer staff model |
-| backend/models/workout.py | Workout plan and assignment models |
-| backend/models/trainer_progress.py | Model for the existing public.trainer_progress table |
-| backend/schemas/trainer.py | Role and progress request validation |
-| backend/repositories/trainer_repository.py | Trainer and assignment queries |
-| backend/services/trainer_service.py | Promotion, assignment ownership and progress rules |
-| backend/routers/trainers.py | Admin and trainer API routes |
-| backend/core/dependencies.py | Shared authenticated-user/admin/trainer dependencies |
-| backend/core/audit.py | Reusable audit logging |
-| frontend/src/pages/TrainerDashboard.tsx | Trainer view and progress form |
-| frontend/src/services/gymtrack.ts | Authenticated API client |
+| Domain/layer | File | Responsibility |
+|---|---|---|
+| Models | `backend/models/resources.py` | Auth sessions, memberships, attendance and groups |
+| Schemas | `backend/schemas/resources.py` | Shared resource request validation |
+| Member repository/service/router | `backend/repositories/member_repository.py`, `backend/services/member_service.py`, `backend/routers/members.py` | Member queries, ownership and CRUD endpoints |
+| Group repository/service/router | `backend/repositories/group_repository.py`, `backend/services/group_service.py`, `backend/routers/groups.py` | Group data access and permission-enforced endpoints |
+| Trainer repository/service/router | `backend/repositories/trainer_repository.py`, `backend/services/trainer_service.py`, `backend/routers/trainers.py` | Trainer profiles, assignment ownership and progress |
+| Shared security | `backend/core/dependencies.py`, `backend/core/audit.py` | Authentication, role dependencies and audit logging |
+| Trainer view | `frontend/src/pages/TrainerDashboard.tsx` | Trainer view and progress form |
+| API client | `frontend/src/services/gymtrack.ts` | Authenticated API calls and refresh behavior |
 
-Older resource endpoints remain in backend/gymtrack_api.py and are documented as pending domain-by-domain refactoring.
+Authentication/profile, attendance, membership, workout-plan/assignment and admin endpoint handlers remain in `backend/gymtrack_api.py` and need domain-by-domain extraction.
 
 ## 4. Trainer role flow
 
