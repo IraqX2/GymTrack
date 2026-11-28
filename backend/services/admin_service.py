@@ -2,7 +2,7 @@
 
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Response
 from sqlmodel import Session, select
@@ -214,7 +214,7 @@ def _delete_admin_content_record(db: Session, content_type: str, record_id: int)
 def get_admin_stats(session: Session) -> dict:
     current = now()
     today_start = current.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = current - __import__("datetime").timedelta(days=7)
+    week_start = current - timedelta(days=7)
     return repository.dashboard_stats(session, today_start, week_start)
 
 
@@ -364,7 +364,7 @@ def list_activity(session: Session, q: str = "", offset: int = 0, limit: int = 5
 
 
 def security_summary(session: Session) -> dict:
-    events = repository.get_security_events(session, now() - __import__("datetime").timedelta(hours=24))
+    events = repository.get_security_events(session, now() - timedelta(hours=24))
     by_ip: dict[str, int] = {}
     by_account: dict[str, int] = {}
     for event in events:
