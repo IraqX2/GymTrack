@@ -12,7 +12,7 @@ except ModuleNotFoundError:
     from services import member_service
 
 
-router = APIRouter(prefix="/api/members", tags=["members"])
+router = APIRouter(tags=["members"])
 
 
 @router.get("")
@@ -55,3 +55,7 @@ def delete_member(member_id: int, user: ADMIN, db: DB, request: Request):
     member_service.delete_member_record(db, member_id)
     audit(db, request, "member_deleted", user, "member", member_id)
     return Response(status_code=204)
+
+@router.get("/api/member/dashboard")
+def member_dashboard(user: CURRENT, db: DB):
+    return member_service.get_member_dashboard(db, user)
