@@ -9,6 +9,11 @@ from sqlmodel import Session, select
 
 try:
     from backend.models.member import Member
+    from backend.models.activity import ActivityLog
+    from backend.models.user import AppUser
+    from backend.models.resources import AuthSession
+    from backend.repositories import admin_repository as repository
+    from backend.services.auth_service import public_user
     from backend.models.trainer_progress import WorkoutProgress
     from backend.models.workout import WorkoutAssignment, WorkoutPlan
     from backend.models.resources import (
@@ -16,6 +21,11 @@ try:
     )
 except ModuleNotFoundError:
     from models.member import Member
+    from models.activity import ActivityLog
+    from models.user import AppUser
+    from models.resources import AuthSession
+    from repositories import admin_repository as repository
+    from services.auth_service import public_user
     from models.trainer_progress import WorkoutProgress
     from models.workout import WorkoutAssignment, WorkoutPlan
     from models.resources import (
@@ -199,3 +209,178 @@ def _delete_admin_content_record(db: Session, content_type: str, record_id: int)
 
 
 
+
+
+def get_admin_stats(session: Session) -> dict:
+    current = now()
+    today_start = current.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = current - __import__("datetime").timedelta(days=7)
+    return repository.dashboard_stats(session, today_start, week_start)
+
+
+def list_admin_users(
+    session: Session,
+    q: str = "",
+    role: str = "",
+    status: str = "",
+    offset: int = 0,
+    limit: int = 20,
+) -> dict:
+    rows, total = repository.list_users(session, q, role, status, offset, limit)
+    return {
+        "items": [public_user(row) for row in rows],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+def get_admin_user_detail(session: Session, target_id: int) -> dict:
+    target = repository.get_user(session, target_id)
+    if target is None:
+        raise HTTPException(404, "User not found")
+    records = repository.user_detail_records(session, target)
+    return {
+        "user": public_user(target),
+        "member": records["member"],
+        "trainer": records["trainer"],
+        "memberships": records["memberships"],
+        "attendance": records["attendance"],
+        "workouts": [
+            {"assignment": assignment, "plan": plan}
+            for assignment, plan in records["workouts"]
+        ],
+        "groups": [
+            {
+                "group": group,
+                "membership": {
+                    "role": membership.role,
+                    "can_create": membership.can_create,
+                    "can_edit": membership.can_edit,
+                    "can_assign": membership.can_assign,
+                    "joined_at": membership.joined_at,
+                },
+            }
+            for membership, group in records["group_rows"]
+        ],
+        "sessions": [
+            {
+                "id": row.id,
+                "created_at": row.created_at,
+                "last_used_at": row.last_used_at,
+                "expires_at": row.expires_at,
+                "revoked_at": row.revoked_at,
+                "ip_address": row.ip_address,
+                "user_agent": row.user_agent,
+                "is_active": row.revoked_at is None and row.expires_at > now(),
+            }
+            for row in records["session_rows"]
+        ],
+        "recent_activity": records["activity_rows"],
+    }
+
+
+def change_user_role(session: Session, target_id: int, actor_id: int, role: str) -> AppUser:
+    if target_id == actor_id:
+        raise HTTPException(400, "You cannot change your own role")
+    target = repository.get_user(session, target_id)
+    if target is None:
+        raise HTTPException(404, "User not found")
+    previous_role = target.role
+    try:
+        from backend.services.trainer_service import ensure_trainer_profile, deactivate_trainer_profile
+    except ModuleNotFoundError:
+        from services.trainer_service import ensure_trainer_profile, deactivate_trainer_profile
+    if role == "trainer":
+        ensure_trainer_profile(session, target)
+    elif previous_role == "trainer":
+        deactivate_trainer_profile(session, target.email)
+    target.role = role
+    target.updated_at = now()
+    return repository.save_user(session, target)
+
+
+def bulk_ban_users(session: Session, actor_id: int, user_ids: list[int], reason: str) -> list[AppUser]:
+    unique_ids = list(dict.fromkeys(user_ids))
+    if actor_id in unique_ids:
+        raise HTTPException(400, "You cannot ban your own account")
+    targets = repository.get_users_by_ids(session, unique_ids)
+    if len(targets) != len(unique_ids):
+        raise HTTPException(404, "One or more users were not found")
+    if any(target.role == "admin" for target in targets):
+        raise HTTPException(400, "Bulk ban cannot include administrator accounts")
+    for target in targets:
+        target.is_banned = True
+        session.add(target)
+        repository.revoke_open_sessions(session, target.id, now())
+    session.commit()
+    return targets
+
+
+def bulk_unban_users(session: Session, user_ids: list[int]) -> list[AppUser]:
+    unique_ids = list(dict.fromkeys(user_ids))
+    targets = repository.get_users_by_ids(session, unique_ids)
+    if len(targets) != len(unique_ids):
+        raise HTTPException(404, "One or more users were not found")
+    for target in targets:
+        target.is_banned = False
+        session.add(target)
+    session.commit()
+    return targets
+
+
+def ban_user(session: Session, target_id: int, actor_id: int, reason: str = "") -> AppUser:
+    if target_id == actor_id:
+        raise HTTPException(400, "You cannot ban yourself")
+    target = repository.get_user(session, target_id)
+    if target is None:
+        raise HTTPException(404, "User not found")
+    if target.role == "admin":
+        raise HTTPException(400, "You cannot ban another admin")
+    target.is_banned = True
+    session.add(target)
+    repository.revoke_open_sessions(session, target_id, now())
+    session.commit()
+    return target
+
+
+def unban_user(session: Session, target_id: int) -> AppUser:
+    target = repository.get_user(session, target_id)
+    if target is None:
+        raise HTTPException(404, "User not found")
+    target.is_banned = False
+    return repository.save_user(session, target)
+
+
+def revoke_user_sessions(session: Session, target_id: int) -> None:
+    if repository.get_user(session, target_id) is None:
+        raise HTTPException(404, "User not found")
+    repository.revoke_open_sessions(session, target_id, now())
+    session.commit()
+
+
+def list_activity(session: Session, q: str = "", offset: int = 0, limit: int = 50):
+    return repository.get_user_activity(session, q, offset, limit)
+
+
+def security_summary(session: Session) -> dict:
+    events = repository.get_security_events(session, now() - __import__("datetime").timedelta(hours=24))
+    by_ip: dict[str, int] = {}
+    by_account: dict[str, int] = {}
+    for event in events:
+        ip = event.ip_address or "Unknown IP"
+        account = event.email or "Unknown account"
+        by_ip[ip] = by_ip.get(ip, 0) + 1
+        by_account[account] = by_account.get(account, 0) + 1
+    return {
+        "failed_logins_24h": len(events),
+        "events": events,
+        "by_ip": [
+            {"ip_address": ip, "count": count}
+            for ip, count in sorted(by_ip.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "by_account": [
+            {"email": email, "count": count}
+            for email, count in sorted(by_account.items(), key=lambda item: item[1], reverse=True)
+        ],
+    }
