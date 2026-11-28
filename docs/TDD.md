@@ -32,11 +32,14 @@ The member, group and trainer domains follow an MVC-style layered architecture:
 | Workout repository/service/router | `backend/repositories/workout_repository.py`, `backend/services/workout_service.py`, `backend/routers/workouts.py` | Workout plans and member/trainer assignments |
 | Group repository/service/router | `backend/repositories/group_repository.py`, `backend/services/group_service.py`, `backend/routers/groups.py` | Group data access and permission-enforced endpoints |
 | Trainer repository/service/router | `backend/repositories/trainer_repository.py`, `backend/services/trainer_service.py`, `backend/routers/trainers.py` | Trainer profiles, assignment ownership and progress |
-| Shared security | `backend/core/dependencies.py`, `backend/core/audit.py` | Authentication, role dependencies and audit logging |
+| Auth repository/service/router | `backend/repositories/auth_repository.py`, `backend/services/auth_service.py`, `backend/routers/auth.py` | Signup/login, JWT, refresh/logout, profile and session workflows |
+| Admin repository/service/router | `backend/repositories/admin_repository.py`, `backend/services/admin_service.py`, `backend/routers/admin.py` | User management, role/ban workflows, activity/security summaries, content moderation and CSV export |
+| App entry point | `backend/gymtrack_api.py` | FastAPI configuration, health checks, startup and router composition |
+| Shared security | `backend/core/dependencies.py`, `backend/core/audit.py` | Authentication dependencies, role checks and audit logging |
 | Trainer view | `frontend/src/pages/TrainerDashboard.tsx` | Trainer view and progress form |
 | API client | `frontend/src/services/gymtrack.ts` | Authenticated API calls and refresh behavior |
 
-Authentication/profile/session and admin endpoint handlers remain in `backend/gymtrack_api.py` and need domain-by-domain extraction.
+`backend/gymtrack_api.py` is now a small app entry point. Routes are registered from domain-specific controllers; database/business logic is distributed across service and repository modules.
 
 ## 4. Trainer role flow
 
