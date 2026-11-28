@@ -38,7 +38,7 @@ GymTrack/
 └── vercel.json
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request flow and MVC-style domain layers. Member, group and trainer routes use dedicated routers, services and repositories. Authentication, attendance, membership, workout-plan/assignment and admin endpoints still have legacy handlers in `backend/gymtrack_api.py`; these are identified as remaining refactoring work.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request flow and MVC-style domain layers. Member, group, trainer, membership, attendance and workout routes use dedicated routers, services and repositories. Authentication/profile/session and admin management/export endpoints still have legacy handlers in `backend/gymtrack_api.py`; these are identified as remaining refactoring work.
 
 ## Run locally
 
