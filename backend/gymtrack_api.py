@@ -339,60 +339,6 @@ def member_dashboard(user: CURRENT, db: DB):
     }
 
 
-# Memberships
-@app.get("/api/memberships")
-def memberships(user: CURRENT, db: DB):
-    query = select(Membership, Member).join(Member, Member.id == Membership.member_id)
-    if user.role != "admin":
-        query = query.where(Membership.member_id == get_my_member(db, user).id)
-    rows = db.exec(query.order_by(Membership.created_at.desc())).all()
-    return [
-        {
-            "id": membership.id,
-            "member_id": membership.member_id,
-            "member_name": member.full_name,
-            "member_email": member.email,
-            "plan_name": membership.plan_name,
-            "start_date": membership.start_date,
-            "end_date": membership.end_date,
-            "price": membership.price,
-            "status": membership.status,
-            "created_at": membership.created_at,
-        }
-        for membership, member in rows
-    ]
-
-
-@app.post("/api/memberships", status_code=201)
-def add_membership(data: MembershipBody, user: ADMIN, db: DB, request: Request):
-    if not db.get(Member, data.member_id): raise HTTPException(404, "Member not found")
-    if data.end_date < data.start_date: raise HTTPException(422, "End date cannot be before start date")
-    if data.status not in {"active", "expired", "cancelled"}: raise HTTPException(422, "Invalid membership status")
-    row = Membership(**data.model_dump()); db.add(row); db.commit(); db.refresh(row)
-    audit(db, request, "membership_created", user, "membership", row.id)
-    return row
-
-
-@app.patch("/api/memberships/{membership_id}")
-def edit_membership(membership_id: int, data: MembershipBody, user: ADMIN, db: DB, request: Request):
-    row = db.get(Membership, membership_id)
-    if not row: raise HTTPException(404, "Membership not found")
-    if not db.get(Member, data.member_id): raise HTTPException(404, "Member not found")
-    if data.end_date < data.start_date: raise HTTPException(422, "End date cannot be before start date")
-    if data.status not in {"active", "expired", "cancelled"}: raise HTTPException(422, "Invalid membership status")
-    for key, value in data.model_dump().items(): setattr(row, key, value)
-    db.add(row); db.commit(); audit(db, request, "membership_updated", user, "membership", row.id)
-    return row
-
-
-@app.delete("/api/memberships/{membership_id}", status_code=204)
-def remove_membership(membership_id: int, user: ADMIN, db: DB, request: Request):
-    row = db.get(Membership, membership_id)
-    if not row: raise HTTPException(404, "Membership not found")
-    db.delete(row); db.commit(); audit(db, request, "membership_deleted", user, "membership", membership_id)
-    return Response(status_code=204)
-
-
 # Attendance
 def as_utc(value: datetime | None) -> datetime | None:
     if value is None:
@@ -605,86 +551,6 @@ def remove_attendance_request(request_id: int, user: CURRENT, db: DB, request: R
     db.delete(request_row)
     db.commit()
     audit(db, request, "attendance_request_removed", user, "attendance_request", request_id)
-    return Response(status_code=204)
-
-
-# Workout plans and assignments
-@app.get("/api/workout-plans")
-def workout_plans(user: CURRENT, db: DB):
-    if user.role == "admin": return db.exec(select(WorkoutPlan).order_by(WorkoutPlan.created_at.desc())).all()
-    my_id = get_my_member(db, user).id
-    plan_ids = select(WorkoutAssignment.plan_id).where(WorkoutAssignment.member_id == my_id)
-    return db.exec(select(WorkoutPlan).where(WorkoutPlan.id.in_(plan_ids))).all()
-
-
-@app.post("/api/workout-plans", status_code=201)
-def add_workout_plan(data: PlanBody, user: ADMIN, db: DB, request: Request):
-    if data.level not in {"beginner", "intermediate", "advanced"}: raise HTTPException(422, "Invalid plan level")
-    row = WorkoutPlan(**data.model_dump(), created_by=user.id)
-    db.add(row); db.commit(); db.refresh(row); audit(db, request, "workout_plan_created", user, "workout_plan", row.id)
-    return row
-
-
-@app.put("/api/workout-plans/{plan_id}")
-def edit_workout_plan(plan_id: int, data: PlanBody, user: ADMIN, db: DB, request: Request):
-    row = db.get(WorkoutPlan, plan_id)
-    if not row: raise HTTPException(404, "Workout plan not found")
-    if data.level not in {"beginner", "intermediate", "advanced"}: raise HTTPException(422, "Invalid plan level")
-    for key, value in data.model_dump().items(): setattr(row, key, value)
-    db.add(row); db.commit(); audit(db, request, "workout_plan_updated", user, "workout_plan", row.id)
-    return row
-
-
-@app.delete("/api/workout-plans/{plan_id}", status_code=204)
-def remove_workout_plan(plan_id: int, user: ADMIN, db: DB, request: Request):
-    row = db.get(WorkoutPlan, plan_id)
-    if not row:
-        raise HTTPException(404, "Workout plan not found")
-    assigned_work = db.exec(
-        select(WorkoutAssignment).where(WorkoutAssignment.plan_id == plan_id)
-    ).first()
-    if assigned_work:
-        raise HTTPException(409, "This workout plan has member assignments. Remove those assignments first.")
-    db.delete(row)
-    db.commit()
-    audit(db, request, "workout_plan_deleted", user, "workout_plan", plan_id)
-    return Response(status_code=204)
-
-
-@app.get("/api/workout-assignments")
-def workout_assignments(user: CURRENT, db: DB):
-    query = select(WorkoutAssignment).order_by(WorkoutAssignment.created_at.desc())
-    if user.role != "admin": query = query.where(WorkoutAssignment.member_id == get_my_member(db, user).id)
-    return db.exec(query).all()
-
-
-@app.post("/api/workout-assignments", status_code=201)
-def create_workout_assignment(data: AssignmentBody, user: ADMIN, db: DB, request: Request):
-    if not db.get(WorkoutPlan, data.plan_id) or not db.get(Member, data.member_id):
-        raise HTTPException(404, "Plan or member not found")
-    if data.trainer_id and not db.get(Trainer, data.trainer_id): raise HTTPException(404, "Trainer not found")
-    duplicate_query = select(WorkoutAssignment).where(
-        WorkoutAssignment.member_id == data.member_id,
-        WorkoutAssignment.plan_id == data.plan_id,
-        WorkoutAssignment.status == data.status,
-    )
-    if data.trainer_id is None:
-        duplicate_query = duplicate_query.where(WorkoutAssignment.trainer_id.is_(None))
-    else:
-        duplicate_query = duplicate_query.where(WorkoutAssignment.trainer_id == data.trainer_id)
-    if db.exec(duplicate_query).first():
-        raise HTTPException(409, "This workout plan is already assigned to this member and trainer.")
-    row = WorkoutAssignment(**data.model_dump(), assigned_by=user.id)
-    db.add(row); db.commit(); db.refresh(row)
-    audit(db, request, "workout_assigned", user, "workout_assignment", row.id)
-    return row
-
-
-@app.delete("/api/workout-assignments/{assignment_id}", status_code=204)
-def remove_workout_assignment(assignment_id: int, user: ADMIN, db: DB, request: Request):
-    row = db.get(WorkoutAssignment, assignment_id)
-    if not row: raise HTTPException(404, "Assignment not found")
-    db.delete(row); db.commit(); audit(db, request, "workout_assignment_deleted", user, "workout_assignment", assignment_id)
     return Response(status_code=204)
 
 
@@ -1275,14 +1141,20 @@ try:
     from backend.routers.trainers import router as trainers_router
     from backend.routers.members import router as members_router
     from backend.routers.groups import router as groups_router
+    from backend.routers.memberships import router as memberships_router
+    from backend.routers.workouts import router as workouts_router
 except ModuleNotFoundError:
     from routers.trainers import router as trainers_router
     from routers.members import router as members_router
     from routers.groups import router as groups_router
+    from routers.memberships import router as memberships_router
+    from routers.workouts import router as workouts_router
 
 app.include_router(trainers_router)
 app.include_router(members_router)
 app.include_router(groups_router)
+app.include_router(memberships_router)
+app.include_router(workouts_router)
 
 
 @app.get("/")
