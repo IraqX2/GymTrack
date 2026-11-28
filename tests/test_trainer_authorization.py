@@ -120,6 +120,42 @@ def test_trainer_progress_route_audits_completion_percent(monkeypatch):
     assert audit_events[0][0][6] == "completion_percent=80"
 
 
+def test_member_cannot_read_another_members_profile(monkeypatch):
+    from backend.services import member_service
+
+    other_member = SimpleNamespace(id=44, user_id=99)
+    monkeypatch.setattr(
+        member_service.repository,
+        "find_member_by_id",
+        lambda session, member_id: other_member,
+    )
+    account = SimpleNamespace(id=12, role="user")
+
+    with pytest.raises(HTTPException) as error:
+        member_service.get_member_record(object(), 44, account)
+
+    assert error.value.status_code == 404
+
+
+def test_group_member_without_create_permission_is_denied():
+    from backend.services.group_service import _allow
+
+    membership = SimpleNamespace(role="member", can_create=False, can_edit=True, can_assign=False)
+
+    with pytest.raises(HTTPException) as error:
+        _allow(membership, "create")
+
+    assert error.value.status_code == 403
+
+
+def test_group_owner_can_create_without_member_flags():
+    from backend.services.group_service import _allow
+
+    owner = SimpleNamespace(role="owner", can_create=False, can_edit=False, can_assign=False)
+
+    assert _allow(owner, "create") is None
+
+
 def test_access_token_verification_rejects_tampered_token():
     from backend.core.dependencies import current_user
 
@@ -136,6 +172,10 @@ def test_application_registers_trainer_routes():
 
     paths = set(app.openapi()["paths"])
     assert "/api/trainer/dashboard" in paths
+    assert "/api/members" in paths
+    assert "/api/members/{member_id}" in paths
+    assert "/api/groups" in paths
+    assert "/api/groups/{group_id}/work" in paths
     assert "/api/trainer/assignments/{assignment_id}/progress" in paths
     assert "/api/admin/users/{target_id}" in paths
     assert "/api/admin/users/bulk-ban" in paths
