@@ -134,6 +134,6 @@ The shared team demonstrates distinct member-level grants:
 
 For the trainer walkthrough, an administrator promotes an eligible normal account to Trainer, assigns a workout plan to a member with that trainer selected, and the promoted account signs in again to open the trainer workspace.
 
-## Known verification items
+## Submission and security notes
 
-The final course rubric still requires live testing and submission artifacts. Review [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) and [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) for the remaining checks. Do not use real member data until Supabase grants/RLS have been reviewed.
+The latest GitHub Actions run checked on 28 November 2026 passed the backend test job and frontend production build. The private final-report PDF contains the application screenshots. A demonstration video was not recorded for this submission. Review [docs/REQUIREMENTS_TRACEABILITY.md](docs/REQUIREMENTS_TRACEABILITY.md) and [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) for implementation and verification details. Do not use real member data until Supabase grants/RLS have been reviewed.
