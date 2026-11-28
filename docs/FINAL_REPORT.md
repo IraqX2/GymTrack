@@ -162,16 +162,20 @@ Member, group and trainer domains are separated into the following layers/files:
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Model | backend/models/trainer.py | Trainer staff profile |
-| Model | backend/models/workout.py | Workout plans and assignments |
-| Model | backend/models/trainer_progress.py | Progress history |
-| Schema | backend/schemas/trainer.py | Validated role and progress payloads |
-| Repository | backend/repositories/trainer_repository.py | Database queries and persistence |
-| Service | backend/services/trainer_service.py | Profile promotion, assignment ownership and progress rules |
-| Router | backend/routers/trainers.py | HTTP endpoints |
+| Model | backend/models/member.py, trainer.py, workout.py, trainer_progress.py, resources.py | Member, trainer, workout, progress, attendance, membership and group tables |
+| Schema | backend/schemas/member.py, trainer.py, admin.py, resources.py | Validated request payloads |
+| Member repository | backend/repositories/member_repository.py | Member database queries and persistence |
+| Member service | backend/services/member_service.py | Member CRUD, ownership and gym-history safeguards |
+| Member router/controller | backend/routers/members.py | Member HTTP endpoints with role checks |
+| Group repository | backend/repositories/group_repository.py | Group, membership and task queries |
+| Group service | backend/services/group_service.py | Owner rules and create/edit/assign permission checks |
+| Group router/controller | backend/routers/groups.py | Group, membership and task endpoints |
+| Trainer repository | backend/repositories/trainer_repository.py | Trainer and assignment queries |
+| Trainer service | backend/services/trainer_service.py | Profile promotion, assignment ownership and progress rules |
+| Trainer router/controller | backend/routers/trainers.py | Trainer HTTP endpoints |
 | Shared dependencies | backend/core/dependencies.py | Signed-in user, admin and trainer authorization |
 | Audit | backend/core/audit.py | Activity event recording |
-| View | frontend/src/pages/TrainerDashboard.tsx | Trainer interface |
+| Views | frontend/src/App.tsx, frontend/src/pages/TrainerDashboard.tsx | User/admin and trainer interfaces |
 
 Membership, attendance, authentication/profile, workout-plan/assignment and admin endpoint handlers still remain in backend/gymtrack_api.py. This report does not claim that the entire legacy API has been migrated. The remaining endpoint-by-endpoint refactor is recorded as technical debt in ARCHITECTURE.md.
 
